@@ -1,0 +1,17 @@
+  --- PLAYER COMMANDS ---
+start <PLID>    sg <PLID>
+play <letter>   pl <letter>
+guess <word>    gw <word>
+scoreboard      sb
+hint            h
+state           st
+quit
+exit
+
+  --- CLIENT MESSAGES ---         --- SERVER MESSAGES ---
+SNG <PLID>                      RSG <status> [n_letters max_errors]
+PLG <PLID> <letter> <trial>     RLG <status> <trial> [n pos*]
+PWG <PLID> <word> <trial>       RWG <status> <trial>
+QUT <PLID>                      RQT <status>
+REV <PLID>        -debug-       RRV <status> / <word>
+
