@@ -8,6 +8,7 @@ state           st
 quit
 exit
 
+                         ---UDP---
   --- CLIENT MESSAGES ---         --- SERVER MESSAGES ---
 SNG <PLID>                      RSG <status> [n_letters max_errors]
 PLG <PLID> <letter> <trial>     RLG <status> <trial> [n pos*]
@@ -15,3 +16,9 @@ PWG <PLID> <word> <trial>       RWG <status> <trial>
 QUT <PLID>                      RQT <status>
 REV <PLID>        -debug-       RRV <status> / <word>
 
+                         ---TCP---
+  --- CLIENT MESSAGES ---         --- SERVER MESSAGES ---
+  GSB                           RSB <status> [Fname Fsize Fdata]
+  GHL <PLID>                    RHL <status> [Fname Fsize Fdata]
+  STA <PLID>                    RST <status> [Fname Fsize Fdata]
+  
