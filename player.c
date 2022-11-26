@@ -5,6 +5,7 @@
 #define DEFAULT_PORT "58000" // + GN
 #define MAX_LINE 37
 #define MAX_COMMAND 10
+#define MAX_PLID 7
 #define MAX_WORD 30
 #define ERROR_MESSAGE_COMMAND "ERROR COMMAND\n"
 #define ERROR_MESSAGE_PLID "ERROR PLID\n"
@@ -50,7 +51,8 @@ int read_command(char* command, char* command_input){
 
 
 int main(int argc, char **argv){
-    char *ip, *port, line[MAX_LINE],command[MAX_COMMAND],command_input[MAX_LINE];
+    int trial;
+    char *ip, *port, line[MAX_LINE],command[MAX_COMMAND],command_input[MAX_LINE],plid[MAX_PLID];
     const char s[2] =" ";
 
     ip=NULL;
@@ -65,24 +67,37 @@ int main(int argc, char **argv){
 
     printf("ip=%s port=%s\n",ip,port);
 
+
+    trial = 0;
     while(read_command(command,command_input)!=-1){
         if(strcmp(command,"start")==0 || strcmp(command,"sg")==0){
             char server_response[128], player_message[12];
-    
             printf("PLID=%s\n", command_input);
             if(check_plid(command_input)==-1){
                 printf(ERROR_MESSAGE_PLID);
                 // Falta tratar os erros
             }
             
-            strcpy(player_message,"SNG ");
-            strcat(player_message,command_input);
-            player_message[10]='\n';
+            // strcpy(player_message,"SNG ");
+            strcpy(plid,command_input);
+            // strcat(player_message,plid);
+            // player_message[10]='\n';
+
+            sprintf(player_message,"SNG %s\n",plid);
 
             if(udp_player_server_com(ip,port,player_message,server_response)==-1){
                 printf(ERROR_MESSAGE_PLAYER_UDP);
             }
-            
+            printf("plid=%s\n",plid);
+        }
+        else if(strcmp(command,"play")==0 || strcmp(command,"pl")==0){
+            char server_response[128], player_message[128];
+            trial++;
+            printf("input=%s\n",command_input);
+            sprintf(player_message,"PLG %s %s %d\n",plid,command_input,trial);
+            if(udp_player_server_com(ip,port,player_message,server_response)==-1){
+                printf(ERROR_MESSAGE_PLAYER_UDP);
+            }   
         }
     }
 }
