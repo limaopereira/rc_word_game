@@ -93,11 +93,18 @@ int main(int argc, char **argv){
         else if(strcmp(command,"play")==0 || strcmp(command,"pl")==0){
             char server_response[128], player_message[128];
             trial++;
-            printf("input=%s\n",command_input);
             sprintf(player_message,"PLG %s %s %d\n",plid,command_input,trial);
             if(udp_player_server_com(ip,port,player_message,server_response)==-1){
                 printf(ERROR_MESSAGE_PLAYER_UDP);
             }   
+        }
+        else if(strcmp(command,"guess")==0 || strcmp(command,"gw")==0){
+            char server_response[128], player_message[128];
+            trial++;
+            sprintf(player_message,"PWG %s %s %d\n",plid,command_input,trial);
+            if(udp_player_server_com(ip,port,player_message,server_response)==-1){
+                printf(ERROR_MESSAGE_PLAYER_UDP);
+            } 
         }
     }
 }
