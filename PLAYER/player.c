@@ -17,7 +17,7 @@ int parse_rsg(char *response, char *word){
     char status[4];
     int i,number_commands,word_size,max_errors;
     
-    number_commands=sscanf(response,"RSG %s %d %d",status,&word_size,&max_errors);
+    number_commands=sscanf(response,"RSG %s %d %d",status,&word_size,&max_errors); // usar regex para verificar se as respostas estão no formato correcto
     if(number_commands!=1 && number_commands!=3)
         return -1;
     for(i=0; i<word_size;i++){
@@ -25,6 +25,17 @@ int parse_rsg(char *response, char *word){
     }
     word[i]='\0';
     printf("New game started (max %d errors): %s\n",max_errors,word);
+}
+
+int parse_rlg(char *response, char *word, char letter){
+    char status[4];
+    int trial, n, number_commands,pos;
+    number_commands = sscanf(response, "RLG %s %d %d", status, &trial,&n);
+    for(int i=10;i<strlen(response);i+=2){
+        sscanf(response+i,"%d",&pos);
+        word[pos]=letter;
+    }
+    printf("Yes, '%c' is part of the word: %s\n",letter,word);
 }
 
 
@@ -101,13 +112,13 @@ int main(int argc, char **argv){
             sprintf(player_message,"SNG %s\n",plid);
 
             open_udp(ip,port,&fd,&res);
+            addrlen=sizeof(addr);
 
             n=sendto(fd,player_message,strlen(player_message),0,res->ai_addr,res->ai_addrlen);
             if(n==-1){
                 printf(ERROR_MESSAGE_SENDTO);
             }
 
-            addrlen=sizeof(addr);
             n=recvfrom(fd,server_response,sizeof(server_response),0,(struct sockaddr*)&addr,&addrlen);
             if(n==-1){
                 printf(ERROR_MESSAGE_RECVFROM);
@@ -124,11 +135,13 @@ int main(int argc, char **argv){
                 printf(ERROR_MESSAGE_SENDTO);
             }
 
-            addrlen=sizeof(addr);
             n=recvfrom(fd,server_response,sizeof(server_response),0,(struct sockaddr*)&addr,&addrlen);
             if(n==-1){
                 printf(ERROR_MESSAGE_RECVFROM);
             }
+
+            parse_rlg(server_response,word, command_input[0]);
+
         }
         else if(strcmp(command,"guess")==0 || strcmp(command,"gw")==0){
             char server_response[128], player_message[128];
@@ -140,7 +153,6 @@ int main(int argc, char **argv){
                 printf(ERROR_MESSAGE_SENDTO);
             }
 
-            addrlen=sizeof(addr);
             n=recvfrom(fd,server_response,sizeof(server_response),0,(struct sockaddr*)&addr,&addrlen);
             if(n==-1){
                 printf(ERROR_MESSAGE_RECVFROM);
