@@ -133,8 +133,10 @@ void parse_rsg(char *response){ //talvez inserir no functions?
         for(i=0;i<word_size;i++)
             word[i]='_';
         word[i]='\0';
+        printf("New game started (max %d errors): %s\n",max_errors,word);
     }
-    printf("New game started (max %d errors): %s\n",max_errors,word);
+    else
+        fprintf(stderr,"ERROR: Invalid game server response. Please try again.\n");
 }
 
 void parse_rlg(char *response, char letter){
@@ -161,10 +163,10 @@ void parse_rlg(char *response, char letter){
                 break;
             case DUP:
                 trials--;
-                printf("Already guessed '%c' letter. Please try again with another letter.\n");
+                printf("Already guessed '%c' letter. Please try again with another letter.\n",letter);
                 break;
             case NOK:
-                printf("No '%c' is not part of the word: %s\n",letter,word);
+                printf("No, '%c' is not part of the word: %s\n",letter,word);
                 break;
             case OVR:
                 printf("GAME OVER!\n");
@@ -178,6 +180,38 @@ void parse_rlg(char *response, char letter){
             default:
                 break;
         }  
+    }
+    else
+        fprintf(stderr,"ERROR: Invalid game server response. Please try again.\n");
+}
+
+void parse_rwg(char *response, char *word_guessed){
+    char status_str[4];
+    int status, trial, num_keys, bytes_readed;
+    
+    num_keys = sscanf(response, "RWG %s %d %n\n",status_str,&trial,&bytes_readed);
+
+    if(valid_server_response(response)){
+        status = parse_server_status(status_str);
+        switch (status){
+            case WIN:
+                printf("WELL DONE! You guessed: %s\n",word_guessed);
+                break;
+            case NOK:
+                printf("No, '%s' is not the correct word.\n",word_guessed);
+                break;
+            case OVR:
+                printf("GAME OVER\n");
+                break;
+            case INV:
+                printf("Invalid trial number\n"); // não tenho a certeza se só acontece quando o trial number não é o correcto
+                break;
+            case ERR:
+                printf("ERROR\n");
+                break;
+            default:
+                break;
+        }
     }
 }
 
@@ -199,7 +233,7 @@ void player_start_game(char *keyword){
 void player_play_letter(char *keyword){
     char player_message[MAX_SIZE], server_message[MAX_SIZE];
     if(!valid_letter(keyword))
-        fprintf(stderr, "ERROR: Invalid player play command keyword. Keyword needs to be a letter. Please try again.\n");
+        fprintf(stderr, "ERROR: Invalid player play letter command keyword. Keyword needs to be a letter. Please try again.\n");
     trials++;
     sprintf(player_message,"PLG %s %s %d\n",PLID,keyword,trials);
     player_server_communication_udp(player_message,server_message);
@@ -207,7 +241,13 @@ void player_play_letter(char *keyword){
 }
 
 void player_guess_word(char *keyword){
-
+    char player_message[MAX_SIZE], server_message[MAX_SIZE];
+    if(!valid_word(keyword))
+        fprintf(stderr, "ERROR: Invalid player guess word command. Keyword needs to be a word. Please try again.\n");
+    trials++;
+    sprintf(player_message,"PWG %s %s %d\n",PLID,keyword,trials);
+    player_server_communication_udp(player_message,server_message);
+    parse_rwg(server_message,keyword);
 }
 
 void player_get_scoreboard(){

@@ -88,4 +88,8 @@ int valid_letter(char *keyword){
     return 1;
 }
 
+int valid_word(char *keyword){
+    return 1;
+}
+
 

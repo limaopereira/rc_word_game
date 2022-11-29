@@ -9,5 +9,6 @@ int parse_player_command(char *cmd_str);
 int parse_server_status(char *status_str);
 int valid_plid(char *keyword);
 int valid_letter(char *keyword);
+int valid_word(char *keyword);
 
 #endif
