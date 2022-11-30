@@ -7,7 +7,7 @@ int main(int argc, char **argv){
     char keyword[MAX_SIZE];
 
     parse_player_args(argc,argv);
-    open_player_udp_socket(); // faz sentido aqui ou só no start?
+    //open_player_udp_socket(); // faz sentido aqui ou só no start?
     while(1){
         parse_player_input(&command,keyword);
         switch (command){

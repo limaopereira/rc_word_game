@@ -15,8 +15,8 @@ char GSIP[MAX_SIZE] = GS_DEFAULT_HOSTNAME;
 char GSport[MAX_SIZE] = GS_DEFAULT_PORT;
 char PLID[PLID_SIZE];
 char word[MAX_WORD_SIZE];
-int fd_socket_udp, trials;
-struct addrinfo hints_udp,*res_udp; // Necessário declarar hints_udp aqui?
+int fd_socket_udp, fd_socket_tcp, trials;
+struct addrinfo hints_udp, hints_tcp, *res_udp, *res_tcp; // Necessário declarar hints_udp aqui?
 struct sockaddr_in addr_udp;
 socklen_t addrlen_udp;
 
@@ -98,11 +98,32 @@ void close_player_udp_socket(){
     
 }
 
+void open_player_tcp_socket(){
+    int errcode;
+
+    fd_socket_tcp = socket(AF_INET,SOCK_STREAM,0);
+    if(fd_socket_tcp == -1){
+        fprintf(stderr, "ERROR: Player TCP socket failed to create. Please try again.\n");
+        exit(EXIT_FAILURE);
+    }
+    memset(&hints_tcp,0,sizeof(hints_tcp));
+    hints_tcp.ai_family=AF_INET;
+    hints_tcp.ai_socktype=SOCK_STREAM;
+
+    errcode = getaddrinfo(GSIP,GSport,&hints_tcp, &res_tcp);
+
+}
+
+void close_player_tcp_socket(){
+    freeaddrinfo(res_tcp);
+    close(fd_socket_tcp);
+}
+
 
 void player_server_communication_udp(char *player_message, char *server_message){
     int n;
     
-
+    open_player_udp_socket();
     // setsockopt para timers
     // outra opção para timers é SIGNALS ou usar o select
 
@@ -120,7 +141,34 @@ void player_server_communication_udp(char *player_message, char *server_message)
         fprintf(stderr,"ERROR: Failed to receive UDP message. Please try again.\n"); 
         exit(EXIT_FAILURE); //faz sentido fechar logo o socket e sair do programa?
     }
-    
+
+    close_player_udp_socket();   
+}
+
+void player_server_communication_tcp(char *player_message, char *server_message){
+    int n;
+
+    n=connect(fd_socket_tcp, res_tcp->ai_addr, res_tcp->ai_addrlen);
+    if(n==-1){
+        close_player_tcp_socket();
+        fprintf(stderr, "ERROR: Failed to connect to game server TCP socket. Please try again.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    n=write(fd_socket_tcp,player_message,strlen(player_message));
+    if(n==-1){
+        close_player_tcp_socket();
+        fprintf(stderr,"ERROR: Failed to send TCP message. Please try again.\n");
+        exit(EXIT_FAILURE);
+    }
+
+    n=read(fd_socket_tcp,server_message,MAX_SIZE);
+    if(n==-1){
+        close_player_tcp_socket();
+        fprintf(stderr, "ERROR: Failed to receive TCP message. Please try again.\n");
+    }
+
+    close_player_tcp_socket();
 }
 
 
