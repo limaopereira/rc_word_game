@@ -14,6 +14,9 @@ void close_player_udp_socket();
 void player_server_communication_udp(char *player_message, char *server_message);
 
 void parse_rsg();
+void parse_rlg(char *response, char letter);
+void parse_rwg(char *response, char *word_guessed);
+void parse_rsb(char *response);
 
 void player_start_game(char *keyword);
 void player_play_letter(char *keyword);

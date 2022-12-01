@@ -111,7 +111,7 @@ void open_player_tcp_socket(){
     hints_tcp.ai_socktype=SOCK_STREAM;
 
     errcode = getaddrinfo(GSIP,GSport,&hints_tcp, &res_tcp);
-
+    
 }
 
 void close_player_tcp_socket(){
@@ -145,8 +145,11 @@ void player_server_communication_udp(char *player_message, char *server_message)
     close_player_udp_socket();   
 }
 
-void player_server_communication_tcp(char *player_message, char *server_message){
-    int n;
+void player_server_communication_tcp(char *player_message, char **server_message_ptr){
+    int n, bytes_readed;
+    char buffer[512];
+
+    open_player_tcp_socket();
 
     n=connect(fd_socket_tcp, res_tcp->ai_addr, res_tcp->ai_addrlen);
     if(n==-1){
@@ -155,6 +158,7 @@ void player_server_communication_tcp(char *player_message, char *server_message)
         exit(EXIT_FAILURE);
     }
 
+    
     n=write(fd_socket_tcp,player_message,strlen(player_message));
     if(n==-1){
         close_player_tcp_socket();
@@ -162,7 +166,15 @@ void player_server_communication_tcp(char *player_message, char *server_message)
         exit(EXIT_FAILURE);
     }
 
-    n=read(fd_socket_tcp,server_message,MAX_SIZE);
+    
+    bytes_readed = 0;
+    while((n=read(fd_socket_tcp,buffer,512))>0){
+        bytes_readed+=n;
+        *server_message_ptr = realloc(*server_message_ptr,bytes_readed);
+        
+        memcpy(*server_message_ptr+bytes_readed-n,buffer,n);
+        //printf("response=%s\n",server_message);
+    }
     if(n==-1){
         close_player_tcp_socket();
         fprintf(stderr, "ERROR: Failed to receive TCP message. Please try again.\n");
@@ -263,6 +275,41 @@ void parse_rwg(char *response, char *word_guessed){
     }
 }
 
+void parse_rsb(char *response){
+    const char s[2]=" ";
+    char status_str[6],fname[50], *fdata; // podemos assumir que o fname nao sera superior a 50?
+    char score_sb[4],plid_sb[PLID_SIZE],word_sb[MAX_WORD_SIZE],trial_sb[3],size_sb[3];
+    int status, fsize, num_keys, bytes_readed, line;
+    FILE *fp = NULL;
+
+    num_keys = sscanf(response, "RSB %s %n\n",status_str, &bytes_readed);
+    if(valid_server_response(response)){ // pensar melhor nesta verificação
+        status = parse_server_status(status_str);
+        switch (status){
+            case OK:
+                response+=bytes_readed;
+                sscanf(response, "%s %d %n",fname,&fsize,&bytes_readed);
+                fp = fopen(fname,"w");
+                line = 0;
+                while(fsize>0){ // o que é suposto fazer quando o ficheiro tem mais bytes do que é suposto?
+                    response += bytes_readed;
+                    sscanf(response, "%s %s %s %s %s %n\n",score_sb,plid_sb,word_sb,trial_sb,size_sb,&bytes_readed);
+                    printf("%d - player %s with %s trials for the %s letter word %s\n",++line,plid_sb,trial_sb,size_sb,word_sb);
+                    if(fsize>=bytes_readed)
+                        fwrite(response,1,bytes_readed,fp);
+                    else
+                        fwrite(response,1,fsize,fp);
+                    fsize-=bytes_readed;
+                }
+                fclose(fp);
+
+                break;
+            case EMPTY:
+                break;
+        }
+    }
+}
+
 
 void player_start_game(char *keyword){
     char player_message[MAX_SIZE], server_message[MAX_SIZE];
@@ -298,8 +345,13 @@ void player_guess_word(char *keyword){
     parse_rwg(server_message,keyword);
 }
 
-void player_get_scoreboard(){
-
+void player_get_scoreboard(){ // falta fazer free na memoria alocada
+    char player_message[MAX_SIZE], *server_message, **server_message_ptr;
+    server_message=NULL;
+    server_message_ptr = &server_message;
+    sprintf(player_message,"GSB\n");
+    player_server_communication_tcp(player_message,server_message_ptr);
+    parse_rsb(server_message); // provavelmente não podemos fazer isto assim, não sabemos inicialmente o tamanho máximo da resposta
 }
 
 void player_get_hint(){

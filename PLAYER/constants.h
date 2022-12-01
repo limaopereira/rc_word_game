@@ -2,8 +2,8 @@
 #define CONSTANTS_H
 
 #define MAX_SIZE 128
-#define PLID_SIZE 6
-#define MAX_WORD_SIZE 30
+#define PLID_SIZE 7
+#define MAX_WORD_SIZE 31
 
 #define GS_DEFAULT_HOSTNAME "localhost"
 #define GS_DEFAULT_PORT "58076"
@@ -26,6 +26,7 @@
 #define NOK 4
 #define OVR 5
 #define INV 6
+#define EMPTY 7
 #define ERR -1
 
 #endif

@@ -68,6 +68,8 @@ int parse_server_status(char *status_str){
         return OVR;
     else if(strcmp(status_str,"INV")==0)
         return INV;
+    else if(strcmp(status_str,"EMPTY")==0)
+        return EMPTY;
     else
         return ERR;
 }
