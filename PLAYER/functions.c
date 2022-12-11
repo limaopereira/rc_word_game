@@ -70,6 +70,10 @@ int parse_server_status(char *status_str){
         return INV;
     else if(strcmp(status_str,"EMPTY")==0)
         return EMPTY;
+    else if(strcmp(status_str,"ACT")==0)
+        return ACT;
+    else if(strcmp(status_str,"FIN")==0)
+        return FIN;
     else
         return ERR;
 }

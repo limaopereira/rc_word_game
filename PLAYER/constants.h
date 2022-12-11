@@ -27,6 +27,8 @@
 #define OVR 5
 #define INV 6
 #define EMPTY 7
+#define ACT 8
+#define FIN 9
 #define ERR -1
 
 #endif

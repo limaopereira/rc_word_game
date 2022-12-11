@@ -316,21 +316,45 @@ void parse_rhl(char *response){
     FILE *fp = NULL;
 
     num_keys = sscanf(response, "RHL %s %n\n", status_str, &bytes_readed);
-    printf("OLAAA\n");
     if(valid_server_response(response)){
         status = parse_server_status(status_str);
         switch (status){
             case OK:
-                printf("ADEUUS\n");
                 response += bytes_readed;
                 sscanf(response, "%s %d %n\n",fname,&fsize,&bytes_readed);
-                printf("WHAAAT?\n");
-                printf("fname=%s fsize=%d\n",fname, fsize);
+                fp = fopen(fname,"w");
+                while(fsize>0){ // falta verificar erros?
+                    response += bytes_readed;
+                    bytes_readed = fwrite(response,1,fsize,fp);
+                    fsize-=bytes_readed;
+                }
+                fclose(fp);
+                break;
+            case NOK:
+                break;
+        }
+    }
+}
+
+void parse_rst(char *response){
+    char status_str[4], fname[24];
+    int status, fsize, num_keys, bytes_readed;
+    FILE *fp = NULL;
+
+    num_keys = sscanf(response, "RST %s %n\n", status_str, &bytes_readed);
+    if(valid_server_response(response)){
+        status = parse_server_status(status_str);
+        switch(status){// pensar melhor para evitar repetir código
+            case ACT:
+            case FIN:
+                response += bytes_readed;
+                sscanf(response, "%s %d %n\n",fname,&fsize,&bytes_readed);
                 fp = fopen(fname,"w");
                 while(fsize>0){
                     response += bytes_readed;
                     bytes_readed = fwrite(response,1,fsize,fp);
-                    fsize-=bytes_readed;
+                    printf("%.*s", bytes_readed, response);
+                    fsize -= bytes_readed;
                 }
                 fclose(fp);
                 break;
@@ -387,7 +411,6 @@ void player_get_scoreboard(){ // falta fazer free na memoria alocada
 
 void player_get_hint(){
     char player_message[MAX_SIZE], *server_message, **server_message_ptr;
-    
     server_message = NULL;
     server_message_ptr = &server_message;
     sprintf(player_message,"GHL %s\n", PLID);
@@ -396,7 +419,12 @@ void player_get_hint(){
 }
 
 void player_get_state(){
-
+    char player_message[MAX_SIZE], *server_message, **server_message_ptr;
+    server_message = NULL;
+    server_message_ptr = &server_message;
+    sprintf(player_message,"STA %s\n",PLID);
+    player_server_communication_tcp(player_message, server_message_ptr);
+    parse_rst(server_message);
 }
 
 void player_quit_game(){
