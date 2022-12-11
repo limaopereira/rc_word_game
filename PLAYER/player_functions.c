@@ -277,7 +277,7 @@ void parse_rwg(char *response, char *word_guessed){
 
 void parse_rsb(char *response){
     const char s[2]=" ";
-    char status_str[6],fname[50], *fdata; // podemos assumir que o fname nao sera superior a 50?
+    char status_str[6],fname[24], *fdata;
     char score_sb[4],plid_sb[PLID_SIZE],word_sb[MAX_WORD_SIZE],trial_sb[3],size_sb[3];
     int status, fsize, num_keys, bytes_readed, line;
     FILE *fp = NULL;
@@ -308,6 +308,37 @@ void parse_rsb(char *response){
                 break;
         }
     }
+}
+
+void parse_rhl(char *response){
+    char status_str[4], fname[24];
+    int status,fsize, num_keys, bytes_readed;
+    FILE *fp = NULL;
+
+    num_keys = sscanf(response, "RHL %s %n\n", status_str, &bytes_readed);
+    printf("OLAAA\n");
+    if(valid_server_response(response)){
+        status = parse_server_status(status_str);
+        switch (status){
+            case OK:
+                printf("ADEUUS\n");
+                response += bytes_readed;
+                sscanf(response, "%s %d %n\n",fname,&fsize,&bytes_readed);
+                printf("WHAAAT?\n");
+                printf("fname=%s fsize=%d\n",fname, fsize);
+                fp = fopen(fname,"w");
+                while(fsize>0){
+                    response += bytes_readed;
+                    bytes_readed = fwrite(response,1,fsize,fp);
+                    fsize-=bytes_readed;
+                }
+                fclose(fp);
+                break;
+            case NOK:
+                break;
+        }
+    }
+
 }
 
 
@@ -355,7 +386,13 @@ void player_get_scoreboard(){ // falta fazer free na memoria alocada
 }
 
 void player_get_hint(){
-
+    char player_message[MAX_SIZE], *server_message, **server_message_ptr;
+    
+    server_message = NULL;
+    server_message_ptr = &server_message;
+    sprintf(player_message,"GHL %s\n", PLID);
+    player_server_communication_tcp(player_message,server_message_ptr);
+    parse_rhl(server_message); 
 }
 
 void player_get_state(){
