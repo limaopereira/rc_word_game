@@ -290,16 +290,11 @@ void parse_rsb(char *response){
                 response+=bytes_readed;
                 sscanf(response, "%s %d %n",fname,&fsize,&bytes_readed);
                 fp = fopen(fname,"w");
-                line = 0;
-                while(fsize>0){ // o que é suposto fazer quando o ficheiro tem mais bytes do que é suposto?
+                while(fsize>0){
                     response += bytes_readed;
-                    sscanf(response, "%s %s %s %s %s %n\n",score_sb,plid_sb,word_sb,trial_sb,size_sb,&bytes_readed);
-                    printf("%d - player %s with %s trials for the %s letter word %s\n",++line,plid_sb,trial_sb,size_sb,word_sb);
-                    if(fsize>=bytes_readed)
-                        fwrite(response,1,bytes_readed,fp);
-                    else
-                        fwrite(response,1,fsize,fp);
-                    fsize-=bytes_readed;
+                    bytes_readed = fwrite(response,1,fsize,fp);
+                    printf("%.*s", bytes_readed, response);
+                    fsize -= bytes_readed;
                 }
                 fclose(fp);
 
@@ -366,6 +361,24 @@ void parse_rst(char *response){
 }
 
 
+void parse_rqt(char *response){
+    char status_str[4];
+    int status, num_keys, bytes_readed;
+
+    num_keys = sscanf(response, "RQT %s %n\n",status_str, &bytes_readed);
+    if(valid_server_response(response)){
+        status = parse_server_status(status_str);
+        switch (status){
+        case OK:
+            printf("Current Game Terminated!\n");
+            break;
+        case ERR:
+            fprintf(stderr,"ERROR: There is no ongoing game.\n");
+            break;
+        }
+    }
+}
+
 void player_start_game(char *keyword){
     char player_message[MAX_SIZE], server_message[MAX_SIZE];
 
@@ -428,7 +441,10 @@ void player_get_state(){
 }
 
 void player_quit_game(){
-
+    char player_message[MAX_SIZE], server_message[MAX_SIZE];
+    sprintf(player_message,"QUT %s\n",PLID);
+    player_server_communication_udp(player_message,server_message);
+    parse_rqt(server_message);
 }
 
 void player_exit_app(){
