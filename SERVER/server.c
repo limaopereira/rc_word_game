@@ -3,8 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
 #include <signal.h> // To catch Ctrl-C
+
+#include "server_functions.h"
+#include "../PLAYER/constants.h" // falta mudar a disposição dos ficheiros
 
 static volatile sig_atomic_t interrupted = 0;
 
@@ -13,8 +15,12 @@ static volatile sig_atomic_t interrupted = 0;
  *
  *	Argument required but isn't used, no need to name it
  */
-void sig_handler(int) {
-	interrupted = 1;
+
+
+void sig_handler() {
+	close_server_udp_socket();
+    // close_server_tcp_socket();
+    exit(EXIT_SUCCESS);
 }
 
 /*
@@ -23,62 +29,64 @@ void sig_handler(int) {
  *	Inputs: port
  *	Returns: 0 if error, 1 otherwise
  */
-int is_valid_port(char *port) {
-	int n = strlen(port);
-	int i, num = 0;
 
-	if (n > 5)
-		return 0;
+// int is_valid_port(char *port) {
+// 	int n = strlen(port);
+// 	int i, num = 0;
+
+// 	if (n > 5)
+// 		return 0;
 	
-	for (i = 0; i < n; i++) {
-		if (port[i] < '0' || port[i] > '9')
-			return 0;
+// 	for (i = 0; i < n; i++) {
+// 		if (port[i] < '0' || port[i] > '9')
+// 			return 0;
 
-		num = num * 10 + (port[i] - '0');
-	}
+// 		num = num * 10 + (port[i] - '0');
+// 	}
 
-	// ports can only be between 1 and 65535
-	// ports between 1 and 1023 are privileged
-	if (num < 1 || num > 65535)
-		return 0;
+// 	// ports can only be between 1 and 65535
+// 	// ports between 1 and 1023 are privileged
+// 	if (num < 1 || num > 65535)
+// 		return 0;
 
-	return 1;
-}
+// 	return 1;
+// }
 
 /*
  *	Inputs: argc, argv
  *	Outputs: verbose, word_file, port
  *	Returns: 1 if error, 0 otherwise
  */
-int parse_args(int argc, char **argv, int *verbose, char **word_file, char **port) {
-	int c;
 
-	while ( (c = getopt(argc, argv, "p:v"))  != -1 )
-		switch (c) {
-			case 'p':
-				if ( ! is_valid_port(optarg) ) {
-					fprintf( stderr, "%s: port number must be between 1 and 65535 -- '%s'\n"
-						"\nUsage: %s word_file [-p GSport] [-v]\n", argv[0], optarg, argv[0] );
-					return 1;
-				}
-				*port = optarg;
-				break;
-			case 'v':
-				*verbose = 1;
-				break;
-			default:
-				fprintf( stderr, "\nUsage: %s word_file [-p GSport] [-v]\n", argv[0] ); 
-				return 1;
-	}
+// int parse_args(int argc, char **argv, int *verbose, char **word_file, char **port) {
+// 	int c;
 
-	if ( !(*word_file = argv[optind]) ) {
-		fprintf( stderr, "%s: argument is required -- 'word_file'\n"
-					"\nUsage: %s word_file [-p GSport] [-v]\n", argv[0], argv[0] );
-		return 1;
-	}
+// 	while ( (c = getopt(argc, argv, "p:v"))  != -1 )
+// 		switch (c) {
+// 			case 'p':
+// 				if ( ! is_valid_port(optarg) ) {
+// 					fprintf( stderr, "%s: port number must be between 1 and 65535 -- '%s'\n"
+// 						"\nUsage: %s word_file [-p GSport] [-v]\n", argv[0], optarg, argv[0] );
+// 					return 1;
+// 				}
+// 				*port = optarg;
+// 				break;
+// 			case 'v':
+// 				*verbose = 1;
+// 				break;
+// 			default:
+// 				fprintf( stderr, "\nUsage: %s word_file [-p GSport] [-v]\n", argv[0] ); 
+// 				return 1;
+// 	}
 
-	return 0;
-}
+// 	if ( !(*word_file = argv[optind]) ) {
+// 		fprintf( stderr, "%s: argument is required -- 'word_file'\n"
+// 					"\nUsage: %s word_file [-p GSport] [-v]\n", argv[0], argv[0] );
+// 		return 1;
+// 	}
+
+// 	return 0;
+// }
 
 
 
@@ -128,32 +136,52 @@ close(fd); // closes socket
 
 
 int main (int argc, char **argv) {
-	int is_verbose	= 0;
-	char *word_file	= "(NULL)";
-	char *port_num	= "58076";
-	//pid_t pid;
+	// int is_verbose	= 0;
+	// char *word_file	= "(NULL)";
+	// char *port_num	= "58076";
+	// //pid_t pid;
 
 	signal(SIGINT, sig_handler);
 
-	if ( parse_args(argc, argv, &is_verbose, &word_file, &port_num) )
-		return 1;
+	// if ( parse_args(argc, argv, &is_verbose, &word_file, &port_num) )
+	// 	return 1;
 
-	printf("is_verbose=%s, port=%s, word_file=%s\n", (is_verbose ? "True" : "False" ), port_num, word_file);
-
-
-	while ( !interrupted ) {
-		sleep(1);
-	}
-
-	/*
-	for (int i = 0; i < 10; i++) {
-		if( (pid=fork()) == -1 ) exit(1);
-		else if ( !pid ) {
-			exit(0);
-		}
-	}
-	*/
+	// printf("is_verbose=%s, port=%s, word_file=%s\n", (is_verbose ? "True" : "False" ), port_num, word_file);
 
 
-	return 0;
+	// while ( !interrupted ) {
+	// 	sleep(1);
+	// }
+
+	// /*
+	// for (int i = 0; i < 10; i++) {
+	// 	if( (pid=fork()) == -1 ) exit(1);
+	// 	else if ( !pid ) {
+	// 		exit(0);
+	// 	}
+	// }
+	// */
+    pid_t pid;
+
+    parse_server_args(argc,argv);
+    load_word_file();
+    
+    pid = fork();
+
+    if(pid == 0){
+        // open_server_tcp_socket();
+        // handle_server_tcp_requests();
+    }
+    else if (pid > 0){
+        open_server_udp_socket();
+        handle_server_udp_requests();
+        close_server_udp_socket();
+    }
+    else{
+        fprintf(stderr,"ERROR: Failed to fork GSport. Please try again\n");
+        exit(EXIT_FAILURE);
+    }
+
+    exit(EXIT_SUCCESS);
+
 }

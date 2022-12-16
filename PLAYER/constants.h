@@ -4,6 +4,8 @@
 #define MAX_SIZE 128
 #define PLID_SIZE 7
 #define MAX_WORD_SIZE 31
+#define MAX_WORDS 26
+#define MAX_HINT_SIZE 51
 
 #define GS_DEFAULT_HOSTNAME "localhost"
 #define GS_DEFAULT_PORT "58076"
