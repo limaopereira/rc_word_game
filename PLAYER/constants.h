@@ -33,4 +33,9 @@
 #define FIN 9
 #define ERR -1
 
+#define NOT_STARTED 1
+#define NOT_PLAYED 2
+#define ON_GOING 3
+
+
 #endif

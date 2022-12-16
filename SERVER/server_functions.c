@@ -5,6 +5,7 @@
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netdb.h>
+#include <time.h>
 
 #include "server_functions.h"
 #include "../PLAYER/constants.h" // atenção a organização dos ficheiros
@@ -199,15 +200,44 @@ int valid_sng_msg(char *values, char *plid, int bytes_readed){
     return 1;
 }
 
-int ongoing_game(char *plid){
-    return 0;
+int game_status(char *plid, char *word){
+    int num_lines;
+    char line[MAX_WORD_SIZE + MAX_HINT_SIZE], filename[PLID_SIZE+12];
+    FILE* fp;
+
+    sprintf(filename,"GAMES/GAME_%s",plid);
+    fp = fopen(filename,"r");
+
+    if(fp){
+        num_lines = 0;
+        while(fgets(line,sizeof(line),fp)!=NULL){
+            num_lines++;
+            if(num_lines>1){
+                fclose(fp);
+                return ON_GOING;
+            }       
+        }
+        
+        sscanf(line,"%s", word); // o que fazer em caso de erro?
+        fclose(fp);
+        return NOT_PLAYED;
+        
+    }
+    else
+        return NOT_STARTED;
 }
 
 void select_word(char *filename, char *word, char *hint){
-    int r = rand() % (MAX_WORDS);
+    int r;
+    srand (time(NULL));
+    r = rand() % (MAX_WORDS);
+    printf("r=%d\n",r);
     strcpy(word,words[r]);
     strcpy(hint,hints[r]);
 }
+
+
+
 
 void get_word_info(char *word, int *size, int *errors){
     *size = strlen(word);
@@ -219,18 +249,37 @@ void get_word_info(char *word, int *size, int *errors){
         *errors = 9;
 }
 
+void create_player_game_file(char *plid, char *word, char *hint){
+    char filename[PLID_SIZE+12]; // 12 = strlen("/GAMES/GAME_")
+    FILE *fp;
+    
+    
+    sprintf(filename,"GAMES/GAME_%s",plid);
+    printf("filename=%s\n",filename);
+
+    fp = fopen(filename,"w"); // o que fazer em caso de erro?
+    
+    fprintf(fp,"%s %s",word,hint);
+    fclose(fp);
+}
+
 
 void server_start_game(char *values){
-    int bytes_readed, word_size, max_errors;
+    int bytes_readed, word_size, max_errors,status;
     char plid[PLID_SIZE], server_message[MAX_SIZE], word[MAX_WORD_SIZE], hint[MAX_HINT_SIZE];
     
     sscanf(values,"%s %n\n",plid,&bytes_readed);
 
     if(valid_sng_msg(values,plid,bytes_readed)){
-        if(ongoing_game(plid))
+        status = game_status(plid,word);
+        if(status==ON_GOING)
             sprintf(server_message,"SNG NOK\n");
+        
         else{
-            select_word(word_filename,word,hint);
+            if(status==NOT_STARTED){
+                select_word(word_filename,word,hint); // talvez verificar erros aqui?
+                create_player_game_file(plid,word,hint); // Qual deve ser o comportamento para os erros?
+            }
             get_word_info(word,&word_size,&max_errors);
             sprintf(server_message,"SNG OK %d %d\n",word_size,max_errors);
             printf("word=%s hint=%s\n", word, hint);
