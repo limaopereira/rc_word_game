@@ -6,6 +6,8 @@
 #define MAX_WORD_SIZE 31
 #define MAX_WORDS 26
 #define MAX_HINT_SIZE 51
+#define MAX_ERRORS 9
+
 
 #define GS_DEFAULT_HOSTNAME "localhost"
 #define GS_DEFAULT_PORT "58076"
@@ -36,6 +38,11 @@
 #define NOT_STARTED 1
 #define NOT_PLAYED 2
 #define ON_GOING 3
+
+#define CODE_TRIAL 'T'
+#define CODE_GUESS 'G'
+#define TRUE 1
+#define FALSE 0
 
 
 #endif
