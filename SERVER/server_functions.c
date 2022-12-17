@@ -253,7 +253,7 @@ void get_word_info(char *word, int *size, int *errors){
         *errors = 7;
     else if(*size <= 10)
         *errors = 8;
-    else if(*size >11)
+    else if(*size > 10)
         *errors = 9;
 }
 
@@ -510,8 +510,72 @@ void server_play_letter(char *values){
     }
 }
 
-void server_guess_word(char *values){
 
+int valid_pwg_msg(char *values, char *plid, int bytes_readed){
+    return 1;
+}
+
+int get_word_status(char *word, char *word_guess, char words_guessed[][MAX_WORD_SIZE], int attempts_left){
+    for(int i = 0;  words_guessed[i][0]!='\0' ; i++){
+        if(strcmp(word_guess,words_guessed[i])==0)
+            return DUP;
+        else if(strcmp(word_guess,word)==0)
+            return WIN;
+    }
+    if(attempts_left==0)
+        return OVR;
+    else
+        return NOK;
+}
+
+void server_guess_word(char *values){
+    int bytes_readed, trial_player, game_status, word_status, word_size, max_errors, attempts_left;
+    int trial_server, num_errors;
+    char word_guess[MAX_WORD_SIZE], plid[PLID_SIZE], server_message[MAX_SIZE];
+    char word[MAX_WORD_SIZE],letters_guessed[MAX_WORD_SIZE],words_guessed[MAX_ERRORS][MAX_WORD_SIZE];
+
+    sscanf(values,"%s %s %d %n\n",plid,word_guess,&trial_player,&bytes_readed);
+
+    if(valid_pwg_msg(values,plid,bytes_readed)){
+        game_status = get_game_info(plid,word,words_guessed,letters_guessed,&trial_server,&num_errors);
+        if(game_status == NOT_STARTED)
+            sprintf(server_message,"RWG ERR\n");
+        else if(trial_server!=trial_player)
+            sprintf(server_message,"RWG INV %d\n",trial_server-1);
+        else{
+            get_word_info(word,&word_size,&max_errors);
+            printf("word info=%s\n",word);
+            attempts_left = max_errors-num_errors;
+            printf("max_errors=%d num_errors=%d\n", max_errors,num_errors);
+            printf("attempts_left=%d\n",attempts_left);
+            word_status = get_word_status(word,word_guess,words_guessed,attempts_left);
+            switch (word_status){
+                case WIN:
+                    write_play_to_file(plid,CODE_GUESS,word_guess,TRUE);
+                    transfer_file_to_player_dir(plid,WIN);
+                    sprintf(server_message,"RWG WIN\n");
+                    break;
+                case DUP:
+                    sprintf(server_message,"RWG DUP\n");
+                    break;
+                case NOK:
+                    write_play_to_file(plid,CODE_GUESS,word_guess,FALSE);
+                    sprintf(server_message,"RWG NOK\n");
+                    break;
+                case OVR:
+                    write_play_to_file(plid,CODE_GUESS,word_guess,FALSE);
+                    transfer_file_to_player_dir(plid,OVR);
+                    sprintf(server_message,"RLG OVR\n");
+                    break;
+            }
+        }
+    }
+    else
+        sprintf(server_message,"RWG ERR\n");
+    bytes_readed = sendto(fd_socket_udp,server_message,strlen(server_message),0,(struct sockaddr*)&addr_udp,addrlen_udp);
+    if (bytes_readed == -1){
+        // fazer o que?
+    }
 }
 
 void server_quit_game(){
