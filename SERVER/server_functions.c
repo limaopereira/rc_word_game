@@ -578,9 +578,33 @@ void server_guess_word(char *values){
     }
 }
 
-void server_quit_game(){
-    
+int valid_qut_msg(char * values, char *plid, int bytes_readed){
+    return 1;
 }
+
+void server_quit_game(char *values){
+    int bytes_readed, game_status;
+    char word[MAX_WORD_SIZE],hint[MAX_HINT_SIZE],plid[PLID_SIZE],server_message[MAX_SIZE];
+    
+    sscanf(values, "%s %n\n",plid,&bytes_readed);
+
+    if(valid_qut_msg(values,plid,bytes_readed)){
+        game_status = get_game_status(plid,word,hint); // pensar se faz sentido usar todas as variaveis
+        if(!(game_status == NOT_STARTED)){
+            transfer_file_to_player_dir(plid,QUIT);
+            sprintf(server_message,"RQT OK\n");
+        }
+        else
+            sprintf(server_message,"RQT NOK\n");
+    }
+    else
+        sprintf(server_message,"RQT ERR\n");
+    bytes_readed = sendto(fd_socket_udp,server_message,strlen(server_message),0,(struct sockaddr*)&addr_udp,addrlen_udp);
+    if (bytes_readed == -1){
+        // fazer o que?
+    }
+}
+
 
 void server_error(){
 
