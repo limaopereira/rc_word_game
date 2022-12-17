@@ -606,6 +606,13 @@ void server_quit_game(char *values){
 }
 
 
-void server_error(){
+void server_error(){ // Pensar melhor nisto
+    int bytes_readed;
+    char server_message[MAX_SIZE];
+    sprintf(server_message,"ERR\n");
+    bytes_readed = sendto(fd_socket_udp,server_message,strlen(server_message),0,(struct sockaddr*)&addr_udp,addrlen_udp);
+    if (bytes_readed == -1){
+        // fazer o que?
+    }
 
 }
