@@ -19,7 +19,7 @@ static volatile sig_atomic_t interrupted = 0;
 
 void sig_handler() {
 	close_server_udp_socket();
-    // close_server_tcp_socket();
+    close_server_tcp_socket();
     exit(EXIT_SUCCESS);
 }
 
@@ -169,9 +169,10 @@ int main (int argc, char **argv) {
     pid = fork();
 
     if(pid == 0){
-        // open_server_tcp_socket();
-        // handle_server_tcp_requests();
-    }
+        open_server_tcp_socket();
+        handle_server_tcp_requests();
+        close_server_tcp_socket();
+    }   
     else if (pid > 0){
         open_server_udp_socket();
         handle_server_udp_requests();

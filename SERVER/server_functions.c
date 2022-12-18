@@ -13,10 +13,11 @@
 #include "../PLAYER/constants.h" // atenção a organização dos ficheiros
  
 int verbose = 0;
-int fd_socket_udp;
-struct sockaddr_in addr_udp;
-struct addrinfo hints_udp,*res_udp;
-socklen_t addrlen_udp;
+int fd_socket_udp, fd_socket_tcp;
+struct sockaddr_in addr_udp, addr_tcp;
+struct addrinfo hints_udp, hints_tcp, *res_udp, *res_tcp;
+socklen_t addrlen_udp, addrlen_tcp;
+
 
 
 char GSport[256]="58076";
@@ -120,7 +121,7 @@ void open_server_udp_socket(){
 
     errcode=bind(fd_socket_udp,res_udp->ai_addr, res_udp->ai_addrlen);
     if(errcode==-1){
-        perror("Failed to bind.\n");
+        //perror("Failed to bind.\n");
         fprintf(stderr,"ERROR: Failed on UDP binding. Please try again\n");
         freeaddrinfo(res_udp);
         close(fd_socket_udp);
@@ -130,9 +131,55 @@ void open_server_udp_socket(){
     addrlen_udp=sizeof(addr_udp);
 }
 
+void open_server_tcp_socket(){
+    int errcode;
+
+    fd_socket_tcp = socket(AF_INET,SOCK_STREAM,0);
+    if(fd_socket_tcp==-1){
+        fprintf(stderr,"ERROR: Server TCP socket failed to create. Please try again.\n"); // create ou open?
+        exit(EXIT_FAILURE);
+    }
+
+    memset(&hints_tcp,0,sizeof(hints_tcp));
+    hints_tcp.ai_family=AF_INET;
+    hints_tcp.ai_socktype=SOCK_STREAM;
+    hints_tcp.ai_flags=AI_PASSIVE;
+
+    errcode=getaddrinfo(NULL,"58001",&hints_tcp,&res_tcp);
+     if(errcode!=0){
+        close(fd_socket_tcp);
+        fprintf(stderr, "ERROR: Failed on TCP address translation. Please try again\n"); // address translation? 
+        exit(EXIT_FAILURE);
+    }
+
+    errcode=bind(fd_socket_tcp,res_tcp->ai_addr, res_tcp->ai_addrlen);
+    if(errcode==-1){
+        //perror("Failed to bind.\n");
+        fprintf(stderr,"ERROR: Failed on TCP binding. Please try again\n");
+        freeaddrinfo(res_tcp);
+        close(fd_socket_tcp);
+        exit(EXIT_FAILURE);
+    }
+
+    errcode = listen(fd_socket_tcp,5);
+    if(errcode==-1){
+        fprintf(stderr,"ERROR: Failed on TCP listen. Please try again\n");
+        freeaddrinfo(res_tcp);
+        close(fd_socket_tcp);
+        exit(EXIT_FAILURE);
+    }
+}
+
+
+
 void close_server_udp_socket(){
     freeaddrinfo(res_udp);
     close(fd_socket_udp);
+}
+
+void close_server_tcp_socket(){
+    freeaddrinfo(res_tcp);
+    close(fd_socket_tcp);
 }
 
 int valid_player_message(char *player_message){
@@ -151,6 +198,20 @@ int parse_server_command_udp(char *command){
     else
         return ERR;
 }
+
+int parse_server_command_tcp(char *command){
+    if(strcmp(command,"GSB")==0)
+        return SCOREBOARD;
+    else if(strcmp(command,"GHL")==0)
+        return HINT;
+    else if(strcmp(command,"STA")==0)
+        return STATE;
+    else
+        return ERR;
+}
+
+
+
 
 // void get_player_message_udp(int *command, char *player_message){
 //     int n;
@@ -175,10 +236,9 @@ void handle_server_udp_requests(){
             cmd_str = strtok(player_message, " ");
             values = strtok(NULL, "");
             //n = sscanf(player_message, "%s %s %n\n",cmd_str,values,&bytes_readed);
-            if(n==-1)
-                command = ERR;
-            else
-                command = parse_server_command_udp(cmd_str);
+            
+            // talvez verificar se o strtok nao vai dar erro?
+            command = parse_server_command_udp(cmd_str);
         }
         switch(command){
             case START:
@@ -199,6 +259,59 @@ void handle_server_udp_requests(){
         }
     }
 }
+
+void handle_server_tcp_requests(){
+    int new_fd, n, command;
+    char buffer[PLID_SIZE], player_message[PLID_SIZE*2], *cmd_str, *values;
+    pid_t pid;
+
+    while(1){
+        addrlen_tcp = sizeof(addr_tcp);
+        if((new_fd=accept(fd_socket_tcp,(struct sockaddr*)&addr_tcp,&addrlen_tcp))==-1){
+            // fazer o que?
+        }
+        pid = fork();
+        if(pid == 0){
+            close(fd_socket_tcp);
+            while((n = read(new_fd,buffer,sizeof(buffer)))>0){
+                strncat(player_message,buffer,n);
+            }
+            if(n<0){
+                // fazer o que?
+            }
+            else{
+                cmd_str = strtok(player_message, " ");
+                values = strtok(NULL, "");
+                command = parse_server_command_tcp(cmd_str);
+                switch (command){
+                    case SCOREBOARD:
+                        server_scoreboard();
+                        break;
+                    case HINT:
+                        server_hint(values);
+                        break;
+                    case STATE:
+                        server_state(values);
+                        break;
+                    case ERR:
+                        server_error_tcp();
+                        break;
+                }
+            }
+            
+            close(new_fd);
+            exit(EXIT_SUCCESS); // necessário?
+        }
+        else if(pid > 0){
+            close(new_fd);
+        }
+        else{
+            // fazer o que?
+        }
+        
+    }
+}
+
 
 int valid_sng_msg(char *values, char *plid, int bytes_readed){
     return 1;
@@ -416,14 +529,25 @@ void write_play_to_file(char *plid, int code, char *play, int correct){
     fclose(fp);
 }
 
-void transfer_file_to_player_dir(char *plid, int code){
+void get_timestamp(char  *timestamp){
+    struct tm *timeinfo;
+    time_t rawtime;
+
+    time(&rawtime);
+    timeinfo = localtime(&rawtime);
+
+    sprintf(timestamp,"%d%02d%02d_%02d%02d%02d",timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
+           timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec);
+}
+
+void transfer_file_to_player_dir(char *plid, int code, char *timestamp){
     char filename_src[PLID_SIZE+12];
     char filename_dst[PLID_SIZE+28]="YYYYMMDD_HHMMSS_W.txt"; // GAMES/ = 6, YYYYMMDD =8, _HHMMSS_ = 8 W.txt\0 = 6 
     char dir_name[PLID_SIZE+6]; // GAMES/ = 6    
     char code_str;
     struct stat st;
-    struct tm *timeinfo;
-    time_t rawtime;
+    //struct tm *timeinfo;
+    //time_t rawtime;
 
     sprintf(dir_name,"GAMES/%s",plid);
     if(stat(dir_name,&st)!=0){
@@ -435,16 +559,15 @@ void transfer_file_to_player_dir(char *plid, int code){
         }
     }
 
-    time(&rawtime);
-    timeinfo = localtime(&rawtime);
+    //time(&rawtime);
+    //timeinfo = localtime(&rawtime);
     if(code==WIN)
         code_str='W';
     else if(code==OVR)
         code_str='F';
     else
         code_str='Q';
-    sprintf(filename_dst,"%s/%d%02d%02d_%02d%02d%02d_%c.txt",dir_name,timeinfo->tm_year + 1900, timeinfo->tm_mon + 1, timeinfo->tm_mday,
-           timeinfo->tm_hour, timeinfo->tm_min, timeinfo->tm_sec,code_str);
+    sprintf(filename_dst,"%s/%s_%c.txt",dir_name,timestamp,code_str);
     sprintf(filename_src,"GAMES/GAME_%s",plid);
     if(rename(filename_src, filename_dst) != 0) {
         // fazer o que?
@@ -458,7 +581,8 @@ void server_play_letter(char *values){
     char letter, plid[PLID_SIZE], server_message[MAX_SIZE]; // atenção aqui no max size, porque podemos ter varias posicoes
     char word[MAX_WORD_SIZE],letters_guessed[MAX_WORD_SIZE],words_guessed[MAX_ERRORS][MAX_WORD_SIZE];
     char positions[MAX_WORD_SIZE*2+MAX_WORD_SIZE]; // pensar um bocadinho melhor nisto, mas a ideia é MAX_WORD_SIZE*2 porque no maximo as posicoes ocupam 2 chars e somamos MAX_WORD_SIZE para o numero maximo de espacos
-    
+    char timestamp[16]; // talvez acrescentar TIMESTAMP_SIZE no constants.h
+
     sscanf(values,"%s %c %d %n\n",plid,&letter,&trial_player,&bytes_readed);
 
     if(valid_plg_msg(values,plid,bytes_readed)){
@@ -483,8 +607,9 @@ void server_play_letter(char *values){
                     sprintf(server_message,"RLG OK %d %s\n",trial_server,positions);
                     break;
                 case WIN:
+                    get_timestamp(timestamp);
                     write_play_to_file(plid,CODE_TRIAL,&letter,TRUE);
-                    transfer_file_to_player_dir(plid,WIN);
+                    transfer_file_to_player_dir(plid,WIN,timestamp);
                     sprintf(server_message,"RLG WIN\n");
                     break;
                 case DUP:
@@ -496,7 +621,7 @@ void server_play_letter(char *values){
                     break;
                 case OVR:
                     write_play_to_file(plid,CODE_TRIAL,&letter,FALSE);
-                    transfer_file_to_player_dir(plid,OVR);
+                    transfer_file_to_player_dir(plid,OVR,timestamp);
                     sprintf(server_message,"RLG OVR\n");
                     break;
             }
@@ -533,6 +658,7 @@ void server_guess_word(char *values){
     int trial_server, num_errors;
     char word_guess[MAX_WORD_SIZE], plid[PLID_SIZE], server_message[MAX_SIZE];
     char word[MAX_WORD_SIZE],letters_guessed[MAX_WORD_SIZE],words_guessed[MAX_ERRORS][MAX_WORD_SIZE];
+    char timestamp[16];
 
     sscanf(values,"%s %s %d %n\n",plid,word_guess,&trial_player,&bytes_readed);
 
@@ -551,8 +677,9 @@ void server_guess_word(char *values){
             word_status = get_word_status(word,word_guess,words_guessed,attempts_left);
             switch (word_status){
                 case WIN:
+                    get_timestamp(timestamp);
                     write_play_to_file(plid,CODE_GUESS,word_guess,TRUE);
-                    transfer_file_to_player_dir(plid,WIN);
+                    transfer_file_to_player_dir(plid,WIN,timestamp);
                     sprintf(server_message,"RWG WIN\n");
                     break;
                 case DUP:
@@ -563,8 +690,9 @@ void server_guess_word(char *values){
                     sprintf(server_message,"RWG NOK\n");
                     break;
                 case OVR:
+                    get_timestamp(timestamp);
                     write_play_to_file(plid,CODE_GUESS,word_guess,FALSE);
-                    transfer_file_to_player_dir(plid,OVR);
+                    transfer_file_to_player_dir(plid,OVR,timestamp);
                     sprintf(server_message,"RLG OVR\n");
                     break;
             }
@@ -585,13 +713,15 @@ int valid_qut_msg(char * values, char *plid, int bytes_readed){
 void server_quit_game(char *values){
     int bytes_readed, game_status;
     char word[MAX_WORD_SIZE],hint[MAX_HINT_SIZE],plid[PLID_SIZE],server_message[MAX_SIZE];
-    
+    char timestamp[16];
+
     sscanf(values, "%s %n\n",plid,&bytes_readed);
 
     if(valid_qut_msg(values,plid,bytes_readed)){
         game_status = get_game_status(plid,word,hint); // pensar se faz sentido usar todas as variaveis
         if(!(game_status == NOT_STARTED)){
-            transfer_file_to_player_dir(plid,QUIT);
+            get_timestamp(timestamp);
+            transfer_file_to_player_dir(plid,QUIT,timestamp);
             sprintf(server_message,"RQT OK\n");
         }
         else
@@ -614,5 +744,22 @@ void server_error(){ // Pensar melhor nisto
     if (bytes_readed == -1){
         // fazer o que?
     }
+
+}
+
+
+void server_scoreboard(){
+
+}
+
+void server_hint(char *values){
+
+}
+
+void server_state(char *values){
+
+}
+
+void server_error_tcp(){
 
 }
