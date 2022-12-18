@@ -7,6 +7,7 @@
 #include <netdb.h>
 #include <time.h>
 #include <sys/stat.h>
+#include <dirent.h>
 
 
 #include "server_functions.h"
@@ -17,7 +18,6 @@ int fd_socket_udp, fd_socket_tcp;
 struct sockaddr_in addr_udp, addr_tcp;
 struct addrinfo hints_udp, hints_tcp, *res_udp, *res_tcp;
 socklen_t addrlen_udp, addrlen_tcp;
-
 
 
 char GSport[256]="58076";
@@ -145,7 +145,7 @@ void open_server_tcp_socket(){
     hints_tcp.ai_socktype=SOCK_STREAM;
     hints_tcp.ai_flags=AI_PASSIVE;
 
-    errcode=getaddrinfo(NULL,"58001",&hints_tcp,&res_tcp);
+    errcode=getaddrinfo(NULL,GSport,&hints_tcp,&res_tcp);
      if(errcode!=0){
         close(fd_socket_tcp);
         fprintf(stderr, "ERROR: Failed on TCP address translation. Please try again\n"); // address translation? 
@@ -154,7 +154,7 @@ void open_server_tcp_socket(){
 
     errcode=bind(fd_socket_tcp,res_tcp->ai_addr, res_tcp->ai_addrlen);
     if(errcode==-1){
-        //perror("Failed to bind.\n");
+        perror("Failed to bind.\n");
         fprintf(stderr,"ERROR: Failed on TCP binding. Please try again\n");
         freeaddrinfo(res_tcp);
         close(fd_socket_tcp);
@@ -260,9 +260,9 @@ void handle_server_udp_requests(){
     }
 }
 
-void handle_server_tcp_requests(){
-    int new_fd, n, command;
-    char buffer[PLID_SIZE], player_message[PLID_SIZE*2], *cmd_str, *values;
+void handle_server_tcp_requests(){ // talvez dividir um bocadinho mais esta funcao
+    int new_fd, n, command,end_msg;
+    char buffer[PLID_SIZE], player_message[PLID_SIZE*2], *msg_ptr,*cmd_str, *values;
     pid_t pid;
 
     while(1){
@@ -273,8 +273,17 @@ void handle_server_tcp_requests(){
         pid = fork();
         if(pid == 0){
             close(fd_socket_tcp);
-            while((n = read(new_fd,buffer,sizeof(buffer)))>0){
-                strncat(player_message,buffer,n);
+            end_msg = FALSE;
+            msg_ptr = player_message;
+            while(end_msg==FALSE){
+                memset(buffer,0,sizeof(buffer));
+                n = read(new_fd,buffer,sizeof(buffer));
+                if(buffer[n-1]=='\n'){
+                    end_msg=TRUE;
+                    buffer[n-1]='\0';
+                }
+                memcpy(msg_ptr,buffer,n);
+                msg_ptr+=n;   
             }
             if(n<0){
                 // fazer o que?
@@ -285,16 +294,16 @@ void handle_server_tcp_requests(){
                 command = parse_server_command_tcp(cmd_str);
                 switch (command){
                     case SCOREBOARD:
-                        server_scoreboard();
+                        server_scoreboard(new_fd);
                         break;
                     case HINT:
-                        server_hint(values);
+                        server_hint(new_fd,values);
                         break;
                     case STATE:
-                        server_state(values);
+                        server_state(new_fd,values);
                         break;
                     case ERR:
-                        server_error_tcp();
+                        server_error_tcp(new_fd);
                         break;
                 }
             }
@@ -659,10 +668,10 @@ int get_word_status(char *word, char *word_guess, char words_guessed[][MAX_WORD_
     for(int i = 0;  words_guessed[i][0]!='\0' ; i++){
         if(strcmp(word_guess,words_guessed[i])==0)
             return DUP;
-        else if(strcmp(word_guess,word)==0)
-            return WIN;
     }
-    if(attempts_left==0)
+    if(strcmp(word,word_guess)==0)
+        return WIN;
+    else if(attempts_left==0)
         return OVR;
     else
         return NOK;
@@ -763,19 +772,100 @@ void server_error(){ // Pensar melhor nisto
 
 }
 
+int find_top_scores(SCORELIST *list){//SCORELIST *list){
+    struct dirent **filelist;
+    int n_entries, i_file, entry;
+    int score, n_succ, n_tot;
+    char plid[PLID_SIZE], word[MAX_WORD_SIZE];
+    char fname[263]; // tinhamos 50 mas para evitar o warning usamos 263
+    FILE *fp;
 
-void server_scoreboard(){
+    n_entries = scandir("SCORES/",&filelist,0,alphasort);
+
+    i_file=0;
+    if(n_entries<0)
+        return 0;
+    else{
+        entry = n_entries;
+        while(entry && entry-- > n_entries-10){ // 10 devido a querer apenas os 10 melhores
+            //printf("entries=%d entry=%d filelist[n_entries]=%s\n",n_entries,entry,filelist[3]->d_name);
+            if(filelist[entry]->d_name[0]!='.'){
+                sprintf(fname,"SCORES/%s",filelist[entry]->d_name);
+                fp = fopen(fname,"r");
+                if(fp!=NULL){
+                    //fscanf(fp,"%d %s %s %d %d",&score,plid,word,&n_succ,&n_tot);
+                    fscanf(fp,"%d %s %s %d %d",&list->score[i_file], list->plid[i_file], list->word[i_file], &list->n_succ[i_file], &list->n_tot[i_file]);
+                }
+                fclose(fp);
+                ++i_file;
+            }
+            free(filelist[n_entries]);
+        }
+        free(filelist);
+    }
+    //list->n_scores=i_file;
+    return i_file;
+}
+
+int create_scoreboard(SCORELIST list, int num_games_won, char **scoreboard){
+    int size,num_bytes;
+    char title[]="-------------------------------- TOP 10 SCORES --------------------------------\n\n";
+    char header[]="    SCORE PLAYER     WORD                             GOOD TRIALS  TOTAL TRIALS\n\n";
+    char line[129]; // 81 mas para evitar warnings do compilador metemos 129
+
+    num_bytes = sizeof(title) + sizeof(header)-2;
+    *scoreboard = malloc(num_bytes);
+    strcat(*scoreboard,title);
+    strcat(*scoreboard,header);
+
+    for(int i = 0; i < num_games_won; i++){
+        //num_bytes+=sizeof(line);
+        num_bytes+=sprintf(line,"%2d - %d  %s  %-39s %-13d %-2d\n",i+1,list.score[i],list.plid[i],list.word[i],list.n_succ[i],list.n_tot[i]);
+        *scoreboard = realloc(*scoreboard,num_bytes);
+        strcat(*scoreboard,line);
+    }
+    num_bytes+=3;
+    *scoreboard = realloc(*scoreboard,num_bytes);
+    strcat(*scoreboard,"\n\n\n");
+    return num_bytes;
+}
+
+    
+
+void server_scoreboard(int new_fd){
+    int n, num_games_won, scoreboard_size, bytes_left;
+    char *server_message,*scoreboard, fname[22];
+    pid_t pid;
+    SCORELIST list;
+    
+    num_games_won = find_top_scores(&list);
+    if (num_games_won == 0){
+        server_message = malloc(11);
+        sprintf(server_message,"RSB EMPTY\n");
+    }
+    else {
+        scoreboard_size = create_scoreboard(list,num_games_won,&scoreboard);
+        pid = getpid();
+        sprintf(fname,"TOPSCORES_%d.txt",pid);
+        server_message = malloc(7+strlen(fname)+1+3+1+scoreboard_size);
+        sprintf(server_message,"RSB OK %s %d %s",fname,scoreboard_size,scoreboard);
+    }
+    bytes_left = strlen(server_message);
+    printf("bytes_left=%d\n",bytes_left);
+    while(bytes_left>0){
+        n = write(new_fd,server_message,bytes_left);
+        bytes_left-=n;
+    }
+}
+
+void server_hint(int new_fd, char *values){
 
 }
 
-void server_hint(char *values){
+void server_state(int new_fd, char *values){
 
 }
 
-void server_state(char *values){
-
-}
-
-void server_error_tcp(){
+void server_error_tcp(int new_fd){
 
 }

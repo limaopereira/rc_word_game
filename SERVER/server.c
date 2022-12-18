@@ -176,6 +176,7 @@ int main (int argc, char **argv) {
     else if (pid > 0){
         open_server_udp_socket();
         handle_server_udp_requests();
+        printf("ADEEUUUS\n");
         close_server_udp_socket();
     }
     else{
