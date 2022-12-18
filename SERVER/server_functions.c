@@ -542,7 +542,7 @@ void get_timestamp(char  *timestamp){
 
 void transfer_file_to_player_dir(char *plid, int code, char *timestamp){
     char filename_src[PLID_SIZE+12];
-    char filename_dst[PLID_SIZE+28]="YYYYMMDD_HHMMSS_W.txt"; // GAMES/ = 6, YYYYMMDD =8, _HHMMSS_ = 8 W.txt\0 = 6 
+    char filename_dst[PLID_SIZE+28]; // GAMES/ = 6, YYYYMMDD =8, _HHMMSS_ = 8 W.txt\0 = 6 
     char dir_name[PLID_SIZE+6]; // GAMES/ = 6    
     char code_str;
     struct stat st;
@@ -572,6 +572,20 @@ void transfer_file_to_player_dir(char *plid, int code, char *timestamp){
     if(rename(filename_src, filename_dst) != 0) {
         // fazer o que?
     }
+}
+
+void create_game_scoreboard_file(char *plid, char *timestamp, char *word, int errors, int n_trials){
+    int n_succ = n_trials-errors;
+    int score;
+    char filename[PLID_SIZE+31];  // SCORES/=7 score=3 _DDMMYYYY_HHMMSS.txt=21
+    FILE *fp;
+
+    score = (n_succ/(double)n_trials)*100;
+    sprintf(filename,"SCORES/%03d_%s_%s.txt",score,plid,timestamp);
+
+    fp = fopen(filename,"w");
+    fprintf(fp,"%03d %s %s %d %d", score,plid,word,n_succ,n_trials);
+    fclose(fp);
 }
 
 
@@ -610,6 +624,7 @@ void server_play_letter(char *values){
                     get_timestamp(timestamp);
                     write_play_to_file(plid,CODE_TRIAL,&letter,TRUE);
                     transfer_file_to_player_dir(plid,WIN,timestamp);
+                    create_game_scoreboard_file(plid,timestamp,word,num_errors,trial_server);
                     sprintf(server_message,"RLG WIN\n");
                     break;
                 case DUP:
@@ -680,6 +695,7 @@ void server_guess_word(char *values){
                     get_timestamp(timestamp);
                     write_play_to_file(plid,CODE_GUESS,word_guess,TRUE);
                     transfer_file_to_player_dir(plid,WIN,timestamp);
+                    create_game_scoreboard_file(plid,timestamp,word,num_errors,trial_server);
                     sprintf(server_message,"RWG WIN\n");
                     break;
                 case DUP:
