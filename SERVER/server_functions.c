@@ -336,7 +336,9 @@ int get_game_status(char *plid, char *word, char *hint){
     FILE* fp;
 
     sprintf(filename,"GAMES/GAME_%s",plid);
+    printf("filename=%s\n",filename);
     fp = fopen(filename,"r");
+    printf("fp=%p\n",fp);
 
     if(fp){
         num_lines = 0;
@@ -808,7 +810,7 @@ int find_top_scores(SCORELIST *list){//SCORELIST *list){
 }
 
 int create_scoreboard(SCORELIST list, int num_games_won, char **scoreboard){
-    int size,num_bytes;
+    int num_bytes;
     char title[]="-------------------------------- TOP 10 SCORES --------------------------------\n\n";
     char header[]="    SCORE PLAYER     WORD                             GOOD TRIALS  TOTAL TRIALS\n\n";
     char line[129]; // 81 mas para evitar warnings do compilador metemos 129
@@ -832,12 +834,14 @@ int create_scoreboard(SCORELIST list, int num_games_won, char **scoreboard){
 
     
 
-void server_scoreboard(int new_fd){
+void server_scoreboard(int new_fd){ 
     int n, num_games_won, scoreboard_size, bytes_left;
     char *server_message,*scoreboard, fname[22];
     pid_t pid;
     SCORELIST list;
     
+    // falta verificar a mensagem do player?
+
     num_games_won = find_top_scores(&list);
     if (num_games_won == 0){
         server_message = malloc(11);
@@ -846,8 +850,10 @@ void server_scoreboard(int new_fd){
     else {
         scoreboard_size = create_scoreboard(list,num_games_won,&scoreboard);
         pid = getpid();
+    
         sprintf(fname,"TOPSCORES_%d.txt",pid);
-        server_message = malloc(7+strlen(fname)+1+3+1+scoreboard_size);
+        server_message = malloc(7+strlen(fname)+1+sizeof(scoreboard_size)+1+scoreboard_size);
+        // é necessário criar o ficheiro no server?
         sprintf(server_message,"RSB OK %s %d %s",fname,scoreboard_size,scoreboard);
     }
     bytes_left = strlen(server_message);
@@ -858,7 +864,77 @@ void server_scoreboard(int new_fd){
     }
 }
 
+int valid_ghl_msg(char *values, char *plid, int bytes_readed){
+    return 1;
+}
+
+long get_hint_file_data(char *hint, char **hint_file_data){
+    long num_bytes, bytes_readed;
+    char filename[MAX_HINT_SIZE+9]; // imagens/ = 9
+    FILE *fp;
+
+    sprintf(filename,"imagens/%s",hint);
+    fp = fopen(filename,"r");
+    printf("filename=%s\n",filename);
+                
+    if(fp){
+        fseek(fp,0,SEEK_END);
+        num_bytes = ftell(fp);
+        rewind(fp);
+        *hint_file_data = malloc(num_bytes);
+        bytes_readed = 0;
+        while(bytes_readed<num_bytes)
+            bytes_readed += fread(*hint_file_data+bytes_readed, sizeof(char), num_bytes-bytes_readed,fp);
+        //(*hint_file_data)[bytes_readed]='\0';
+        fclose(fp);
+        return num_bytes;
+    }
+    else{
+        // fazer o que?
+    }
+
+    
+
+
+
+}
+
 void server_hint(int new_fd, char *values){
+    int n, bytes_readed, game_status, bytes_left;
+    long hint_file_size;
+    char plid[PLID_SIZE],word[MAX_WORD_SIZE], hint[MAX_HINT_SIZE], *server_message;
+    char *hint_file_data;
+
+    
+    sscanf(values,"%s %n\n",plid,&bytes_readed);
+
+    if(valid_ghl_msg(values,plid,bytes_readed)){
+        game_status = get_game_status(plid,word,hint);
+        if(game_status==NOT_STARTED){
+            server_message = malloc(9);
+            sprintf(server_message,"RHL NOK\n");
+            bytes_left = strlen(server_message);
+        }
+        else{
+            hint_file_size = get_hint_file_data(hint,&hint_file_data);
+            server_message = malloc(7+strlen(hint)+1+sizeof(hint_file_size)+1+hint_file_size);
+            sprintf(server_message,"RHL OK %s %ld ",hint,hint_file_size); 
+            memcpy(server_message+strlen(server_message)-1,hint_file_data,hint_file_size);
+            //strncat(server_message,hint_file_data,hint_file_size);
+            bytes_left = strlen(server_message)+hint_file_size;
+        }
+    }
+    else{
+        server_message = malloc(9);
+        sprintf(server_message,"RHL NOK\n");
+        bytes_left=strlen(server_message);
+    }
+    
+    while(bytes_left>0){
+        n = write(new_fd,server_message,bytes_left);
+        bytes_left-=n;
+    }
+
 
 }
 
