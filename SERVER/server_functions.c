@@ -300,6 +300,7 @@ void handle_server_tcp_requests(){ // talvez dividir um bocadinho mais esta func
                         server_hint(new_fd,values);
                         break;
                     case STATE:
+                        printf("STATEEE\n");
                         server_state(new_fd,values);
                         break;
                     case ERR:
@@ -892,11 +893,6 @@ long get_hint_file_data(char *hint, char **hint_file_data){
     else{
         // fazer o que?
     }
-
-    
-
-
-
 }
 
 void server_hint(int new_fd, char *values){
@@ -934,11 +930,340 @@ void server_hint(int new_fd, char *values){
         n = write(new_fd,server_message,bytes_left);
         bytes_left-=n;
     }
+}
 
+int valid_sta_msg(char *values, char *plid, int bytes_readed){
+    return 1;
+}
+
+int find_last_game(char *plid, char *fname){
+    struct dirent **filelist;
+    int n_entries, found;
+    char dirname[20];
+
+    sprintf(dirname,"GAMES/%s/",plid);
+    n_entries = scandir(dirname,&filelist,0,alphasort);
+    found = 0;
+
+    if(n_entries<=0)
+        return 0;
+    else{
+        while(n_entries--){
+            if(filelist[n_entries]->d_name[0]!='.'){
+                sprintf(fname,"GAMES/%s/%s",plid,filelist[n_entries]->d_name);
+                found = 1;
+            }
+            free(filelist[n_entries]);
+            if(found)
+                break;
+        }
+        free(filelist);
+    }
+    return(found);
+}
+
+
+
+
+
+int create_state_summary(char *plid, char **state_summary, int type){
+    int num_lines, result, num_bytes, num_bytes_line, num_bytes_content;
+    char line[MAX_WORD_SIZE+MAX_HINT_SIZE], filename[28+PLID_SIZE]; // yyyymmdd_hhmmss_t.txt = 22 GAMES/ = 6
+    char code, word[MAX_WORD_SIZE], hint[MAX_HINT_SIZE], play[MAX_WORD_SIZE];
+    char *word_solved;
+    char trial_type[15], result_type[10];
+    char *content, header[70+21+MAX_WORD_SIZE+MAX_HINT_SIZE], footer[16+MAX_WORD_SIZE], summary_line[sizeof(trial_type)+sizeof(result_type)+MAX_WORD_SIZE+6];
+    char termination_str[5];
+
+    FILE *fp;
+
+
+      
+    if(type==ON_GOING)
+        sprintf(filename,"GAMES/GAME_%s",plid);
+    else{
+        find_last_game(plid,filename);
+        printf("termination_str=%c\n",filename[strlen(filename)-4]);
+        switch (filename[strlen(filename)-5]){
+        case 'W':
+            strcpy(termination_str,"WIN");
+            break;
+        case 'F':
+            strcpy(termination_str,"FAIL");
+            break;
+        case 'Q':
+            strcpy(termination_str,"QUIT");
+            break;
+        }
+    }
+    fp = fopen(filename,"r");
+    printf("filename=%s\n",filename);
+
+    //"Last finalized game for player 098580\n--- Transactions found: 99 ---\n"
+
+    if(fp){
+        num_lines = 0;
+        num_bytes = 0;
+        num_bytes_content = 0;
+        //*state_summary=NULL;
+        content = NULL;
+        
+        
+        while(fgets(line,sizeof(line),fp)!=NULL){
+            if(num_lines == 0){
+                sscanf(line,"%s %s\n",word,hint);
+                word_solved = malloc(strlen(word)+1);
+                for(int i=0;i<strlen(word);i++)
+                    word_solved[i]='-';
+            }     
+            else{
+                sscanf(line,"%c %s %d\n",&code,play,&result);
+                if(code == 'T'){
+                    for(int i=0;i<strlen(word);i++)
+                        if(word[i]==play[0])
+                            word_solved[i]=play[0];
+                    strcpy(trial_type,"Letter Trial: ");
+                    if(result == TRUE)
+                        strcpy(result_type," - TRUE\n");
+                    else
+                        strcpy(result_type," - FALSE\n");
+                }
+                else{
+                    strcpy(trial_type,"Word guess: ");
+                    strcpy(result_type,"\n");
+                }
+                //"Letter Trial: e - TRUE\nLetter Trial: r - TRUE\nLetter Trial: e - TRUE\n"
+                //num_bytes_line = strlen(trial_type)+strlen(play)+strlen(result_type);
+                sprintf(summary_line,"%s%s%s",trial_type,play,result_type);
+                num_bytes_line = strlen(summary_line);
+                num_bytes_content += num_bytes_line;
+                if(num_bytes_content==num_bytes_line){
+                    content = malloc(num_bytes_content+1);
+                    strcpy(content,summary_line);
+                }
+                else{
+                    content = realloc(content,num_bytes_content);
+                    strcat(content,summary_line);
+                }
+                //num_bytes_content += num_bytes_line+1;
+                //num_bytes_content = strlen(content)+num_bytes_line+1;
+                //content = realloc(content,num_bytes_content);
+                //strcat(content,summary_line);
+                
+            }
+            num_lines++;
+        }
+
+
+        if(num_lines>0){
+            if(type == ON_GOING)
+                sprintf(header,"Active game found for player %s\n--- Transactions found: %d ---\n",plid,num_lines-1);
+            else
+                sprintf(header,"Last finalized game for player %s\nWord: %s; Hint file: %s\n--- Transactions found: %d ---\n",plid,word,hint,num_lines-1);
+        }
+        else
+            sprintf(header,"Game started - no transactions found\n");
+        if(type == ON_GOING){
+            sprintf(footer,"Solved so far: %s\n",word_solved); //melhorar
+        }
+        else{
+            sprintf(footer,"Termination: %s\n",termination_str);
+        }
+       
+        num_bytes += strlen(header)+strlen(content),strlen(footer);
+        *state_summary = malloc(num_bytes+1);
+        sprintf(*state_summary,"%s%s%s",header,content,footer);
+        //printf("state_summary=%s",*state_summary);
+        printf("ESTAMOS BEM?\n");
+        return num_bytes;
+    }
+    else{
+
+        // fazer o que?
+    }
+}
+
+int create_state_header(char *header, char *plid, char *word, char *hint, int num_transactions, int type){
+    if(num_transactions>0){
+        if(type == ON_GOING)
+            sprintf(header,"Active game found for player %s\n--- Transactions found: %d ---\n",plid,num_transactions);
+        else
+            sprintf(header,"Last finalized game for player %s\nWord: %s; Hint file: %s\n--- Transactions found: %d ---\n",plid,word,hint,num_transactions);
+    }
+    else
+        sprintf(header,"Game started - no transactions found\n");
+    return strlen(header);
+}
+
+int create_state_content(char **content, char **word_solved, char *word, char *hint, int *num_transactions, FILE *fp){
+    int num_lines, num_bytes_content, num_bytes_line, result;
+    char code, play[MAX_WORD_SIZE], line[MAX_WORD_SIZE+MAX_HINT_SIZE], trial_type[15], result_type[10];
+    char summary_line[sizeof(trial_type)+sizeof(result_type)+MAX_WORD_SIZE+6];
+
+    num_lines = 0;
+    num_bytes_content = 0;
+
+    while(fgets(line,sizeof(line),fp)!=NULL){
+            if(num_lines == 0){
+                sscanf(line,"%s %s\n",word,hint);
+                *word_solved = malloc(strlen(word)+1);
+                for(int i=0;i<strlen(word);i++)
+                    (*word_solved)[i]='-';
+            }
+            else{
+                sscanf(line,"%c %s %d\n",&code,play,&result);
+                if(code == 'T'){
+                    for(int i=0;i<strlen(word);i++)
+                        if(word[i]==play[0])
+                            (*word_solved)[i]=play[0];
+                    strcpy(trial_type,"Letter Trial: ");
+                    if(result == TRUE)
+                        strcpy(result_type," - TRUE\n");
+                    else
+                        strcpy(result_type," - FALSE\n");
+                }
+                else{
+                    strcpy(trial_type,"Word guess: ");
+                    strcpy(result_type,"\n");
+                }
+                sprintf(summary_line,"%s%s%s",trial_type,play,result_type);
+                num_bytes_line = strlen(summary_line);
+                num_bytes_content += num_bytes_line;
+                if(num_bytes_content==num_bytes_line){
+                    *content = malloc(num_bytes_content+1);
+                    strcpy(*content,summary_line);
+                }
+                else{
+                    *content = realloc(*content,num_bytes_content);
+                    strcat(*content,summary_line);
+                }
+            }
+    num_lines++;
+    }
+    *num_transactions=num_lines-1;
+    return num_bytes_content;
+}
+
+int create_state_footer(char *footer, char *filename, char *word_solved, int type){
+    char termination_str[5];
+    
+    if(type == ON_GOING)
+        sprintf(footer,"Solved so far: %s\n",word_solved);
+    else{
+        switch(filename[strlen(filename)-5]){
+            case 'W':
+                strcpy(termination_str,"WIN");
+                break;
+            case 'F':
+                strcpy(termination_str,"FAIL");
+                break;
+            case 'Q':
+                strcpy(termination_str,"QUIT");
+                break;
+        }
+        sprintf(footer,"Termination: %s\n",termination_str);
+    }
 
 }
 
+
+int get_state_file_data(char *filename, char *plid, char **state_data, int type){
+    int size_header, size_content, size_footer, num_transactions, num_bytes;
+    char *content, header[70+21+MAX_WORD_SIZE+MAX_HINT_SIZE], footer[16+MAX_WORD_SIZE];
+    char *word_solved, word[MAX_WORD_SIZE],hint[MAX_HINT_SIZE];
+
+    FILE *fp;
+
+    fp = fopen(filename,"r");
+    if(fp){
+        size_content = create_state_content(&content,&word_solved,word,hint,&num_transactions,fp);
+        printf("content=%s",content);
+        size_header = create_state_header(header,plid,word,hint,num_transactions,type);
+        printf("header=%s",header);
+        size_footer = create_state_footer(footer,filename,word_solved,type);
+        printf("size_footer=%d footer=%s",size_footer,footer);
+        
+        num_bytes = size_header + size_content + size_footer + 1; 
+        *state_data = malloc(num_bytes);    
+        sprintf(*state_data,"%s%s%s",header,content,footer);
+        return num_bytes;
+    }
+    else{
+        // fazer o que?
+    }
+}
+
+
+
 void server_state(int new_fd, char *values){
+    int n, bytes_readed, game_status, state_file_size, found, bytes_left;
+    char plid[PLID_SIZE],filename[28+PLID_SIZE]; // yyyymmdd_hhmmss_t.txt = 22 GAMES/ = 6 ;
+    char word[MAX_WORD_SIZE], hint[MAX_HINT_SIZE];
+    char *state_data, *server_message;
+    
+    sscanf(values,"%s %n\n",plid,&bytes_readed);
+    if(valid_sta_msg(values,plid,bytes_readed)){
+        game_status = get_game_status(plid,word,hint);
+        if(game_status != NOT_STARTED){
+            sprintf(filename,"GAMES/GAME_%s",plid);
+            state_file_size = get_state_file_data(filename,plid,&state_data,ON_GOING);
+            printf("state_file_size=%d state_data=%s",state_file_size,state_data);
+            server_message = malloc(25+sizeof(state_file_size)+1+state_file_size);
+            sprintf(server_message,"RST ACT STATE_%s.txt %d %s",plid,state_file_size,state_data);
+        }
+        else{
+            if(find_last_game(plid,filename)){
+                state_file_size = get_state_file_data(filename,plid,&state_data,FIN);
+                printf("state_file_size=%d state_data=%s",state_file_size,state_data);
+                server_message = malloc(25+sizeof(state_file_size)+1+state_file_size);
+                sprintf(server_message,"RST ACT STATE_%s.txt %d %s",plid,state_file_size,state_data);
+            }
+            else{
+                server_message = malloc(9);
+                sprintf(server_message,"RST NOK\n");
+            }
+        }
+    }
+    else{
+        // fazer o que?
+    }
+    bytes_left = strlen(server_message);
+    while(bytes_left>0){
+        n = write(new_fd,server_message,bytes_left);
+        bytes_left-=n;
+    }
+}
+
+
+void server_state_2(int new_fd, char *values){
+    int bytes_readed, game_status, state_summary_size;
+    char plid[PLID_SIZE], word[MAX_WORD_SIZE], hint[MAX_HINT_SIZE];
+    char *state_summary, *server_message;
+
+    
+    printf("values=%s\n",values);
+    sscanf(values,"%s %n\n",plid,&bytes_readed);
+    printf("BBBBBBBBBB\n");
+    if(valid_sta_msg(values,plid,bytes_readed)){
+        game_status = get_game_status(plid,word,hint);
+        
+        if(game_status != NOT_STARTED){
+            state_summary_size = create_state_summary(plid,&state_summary,ON_GOING); //falta a parte do finalized
+            printf("ERRO AQUI TAMBEM?\n");
+            server_message = malloc(25+sizeof(state_summary_size)+1+state_summary_size);  // RST ACT STATE_098580.txt = 25
+            //sprintf(server_message,"RST ACT STATE_%s.txt %d %s",plid,state_summary_size,state_summary);
+            
+        }
+        else{
+            state_summary_size = create_state_summary(plid,&state_summary,NOT_STARTED);
+            printf("ERRO?\n");
+            //server_message = malloc(25+sizeof(state_summary_size)+1+state_summary_size);
+            //sprintf(server_message,"RST FIN STATE_%s.txt %d %s",plid,state_summary_size,state_summary);
+            printf("state_summary=%s",state_summary);
+        }
+        
+            
+    }
 
 }
 
