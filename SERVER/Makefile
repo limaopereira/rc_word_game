@@ -2,13 +2,13 @@ CC		= gcc
 CFLAGS	= -O3 -Wall
 TARGET	= GS
 
-SOURCES	= server.c
-
+SOURCES	= udp_server.c tcp_server.c server-nex.c
+DEPS	= server.h Makefile
 
 all: $(TARGET)
 
-$(TARGET): $(SOURCES)
-	$(CC) $(CFLAGS) -o $@ $^
+$(TARGET): $(SOURCES) $(DEPS)
+	$(CC) $(CFLAGS) $(SOURCES) -o $@ 
 
 clean:
 	rm -f $(TARGET)

@@ -18,7 +18,6 @@ REV <PLID>        -debug-       RRV <status> / <word>
 
                          ---TCP---
   --- CLIENT MESSAGES ---         --- SERVER MESSAGES ---
-  GSB                           RSB <status> [Fname Fsize Fdata]
-  GHL <PLID>                    RHL <status> [Fname Fsize Fdata]
-  STA <PLID>                    RST <status> [Fname Fsize Fdata]
-  
+GSB                             RSB <status> [Fname Fsize Fdata]
+GHL <PLID>                      RHL <status> [Fname Fsize Fdata]
+STA <PLID>                      RST <status> [Fname Fsize Fdata]
