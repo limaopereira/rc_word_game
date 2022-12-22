@@ -12,7 +12,7 @@
 #define GS_DEFAULT_HOSTNAME "localhost"
 #define GS_DEFAULT_PORT "58076"
 
-
+#define MAX_TIME_READ_UDP 5
 
 #define START 1
 #define PLAY 2
@@ -23,6 +23,7 @@
 #define QUIT 7
 #define EXIT 8
 #define INVALID_CMD -1
+#define INVALID_INPUT -2
 
 #define OK 1
 #define WIN 2

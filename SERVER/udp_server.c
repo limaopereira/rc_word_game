@@ -311,9 +311,12 @@ int player_guess_letter(char *message) {
 
 	int hits = 0;
 	sprintf( message, "RLG OK %d", trial );
-	for ( ; game.word[i]; i++ ) {
-		if ( game.word[i] == letter ) {
+	for ( ; game.word[i]; i++ )
+		if ( game.word[i] == letter )
 			hits++;
+	sprintf( message + strlen(message), " %d", hits );
+	for ( i = 0; game.word[i]; i++ ) {
+		if ( game.word[i] == letter ) {
 			sprintf( message + strlen(message), " %d", i + 1 );
 			game.current_state[i] = letter; // Fill out current state with the letter
 		}
@@ -339,7 +342,7 @@ int player_guess_letter(char *message) {
 	i = scandir("SCORES/", &namelist, NULL, alphasort);
 	while (i--) {
 		if ( !strncmp( namelist[i]->d_name + 4, PLID, PLID_SIZE ) )
-			strcpy(score, namelist[i]->d_name);
+			strncpy(score, namelist[i]->d_name, 3);
 		free(namelist[i]);
 	}
 	free(namelist);
@@ -347,7 +350,7 @@ int player_guess_letter(char *message) {
 	if ( is_valid_num(score, 1, 100) < i ) {
 		sprintf( game_path, "SCORES/%s_%s.txt", score, PLID );
 		remove(game_path);
-		sprintf( game_path, "SCORES/%3d_%s.txt", i, PLID );
+		sprintf( game_path, "SCORES/%03d_%s.txt", i, PLID );
 		save_game(game_path, game);
 	}
 	save_game(game_path, game);
@@ -455,13 +458,12 @@ int player_guess_word(char *message) {
 	game.status = 1;
 	save_game(game_path, game);
 
-
 	// Save to SCORES, check if previous game and overwrite if better
 	struct dirent **namelist;
 	i = scandir("SCORES/", &namelist, NULL, alphasort);
 	while (i--) {
 		if ( !strncmp( namelist[i]->d_name + 4, PLID, PLID_SIZE ) )
-			strcpy(score, namelist[i]->d_name);
+			strncpy(score, namelist[i]->d_name, 3);
 		free(namelist[i]);
 	}
 	free(namelist);
@@ -469,7 +471,7 @@ int player_guess_word(char *message) {
 	if ( is_valid_num(score, 1, 100) < i ) {
 		sprintf( game_path, "SCORES/%s_%s.txt", score, PLID );
 		remove(game_path);
-		sprintf( game_path, "SCORES/%3d_%s.txt", i, PLID );
+		sprintf( game_path, "SCORES/%03d_%s.txt", i, PLID );
 		save_game(game_path, game);
 	}
 	save_game(game_path, game);

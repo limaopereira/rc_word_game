@@ -273,11 +273,11 @@ int send_state(int socket, char *message) {
 				bytes_written += sprintf( buffer + bytes_written, "     Word guess: %s\n", game.guesses[i] );
 			} else {
 				int j;
-				for (j = 0; game.letters_guessed[j] && game.letters_guessed[j] != game.guesses[i][0]; j++);
+				for (j = 0; game.word[j] && game.word[j] != game.guesses[i][0]; j++);
 
-				if ( game.letters_guessed[j] )
+				if ( game.word[j] )
 					bytes_written += sprintf( buffer + bytes_written, "     Letter trial: %s - TRUE\n", game.guesses[i] );
-				else
+				else if ( game.guesses[i][0] )
 					bytes_written += sprintf( buffer + bytes_written, "     Letter trial: %s - FALSE\n", game.guesses[i] );
 			}
 		}
@@ -295,11 +295,11 @@ int send_state(int socket, char *message) {
 				bytes_written += sprintf( buffer + bytes_written, "     Word guess: %s\n", game.guesses[i] );
 			} else {
 				int j;
-				for (j = 0; game.letters_guessed[j] && game.letters_guessed[j] != game.guesses[i][0]; j++);
+				for (j = 0; game.word[j] && game.word[j] != game.guesses[i][0]; j++);
 
-				if ( game.letters_guessed[j] )
+				if ( game.word[j] )
 					bytes_written += sprintf( buffer + bytes_written, "     Letter trial: %s - TRUE\n", game.guesses[i] );
-				else
+				else if ( game.guesses[i][0] )
 					bytes_written += sprintf( buffer + bytes_written, "     Letter trial: %s - FALSE\n", game.guesses[i] );
 			}
 		}

@@ -1,8 +1,8 @@
 CC		= gcc
-CFLAGS	= -O3 -Wall
+CFLAGS	= -O3 -Wall -Wno-unused-variable -Wno-unused-but-set-variable
 TARGET	= player
 
-SOURCES	= player.c functions.c player_functions.c 
+SOURCES	= player.c player_functions.c 
 
 
 all: $(TARGET)

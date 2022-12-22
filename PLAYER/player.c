@@ -7,6 +7,7 @@ int main(int argc, char **argv){
     char keyword[MAX_SIZE];
 
     parse_player_args(argc,argv);
+    introduction_text();    
     //open_player_udp_socket(); // faz sentido aqui ou só no start?
     while(1){
         parse_player_input(&command,keyword);
@@ -37,6 +38,9 @@ int main(int argc, char **argv){
                 break;
             case INVALID_CMD:
                 fprintf(stderr,"ERROR: Invalid player command. Please try again.\n");
+                break;
+            case INVALID_INPUT:
+                fprintf(stderr,"ERROR: Invalid player input. Please try again.\n");
                 break;
         }
     }

@@ -1,5 +1,5 @@
 CC		= gcc
-CFLAGS	= -O3 -Wall -Wno-unused-result
+CFLAGS	= -O3 -Wall -Wno-unused-result -Wno-stringop-truncation
 TARGET	= GS
 
 SOURCES	= udp_server.c tcp_server.c server.c
