@@ -2,7 +2,7 @@ CC		= gcc
 CFLAGS	= -O3 -Wall
 TARGET	= GS
 
-SOURCES	= udp_server.c tcp_server.c server-nex.c
+SOURCES	= udp_server.c tcp_server.c server.c
 DEPS	= server.h Makefile
 
 all: $(TARGET)

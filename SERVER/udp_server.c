@@ -32,9 +32,10 @@ static volatile sig_atomic_t udp_interrupted = 0;
 /*
  *	Catches Ctrl-C to safely stop everything
  *
- *	Argument required but isn't used, no need to name it
+ *	Argument required but isn't used.
  */
-void udp_sig_handler(int) {
+void udp_sig_handler(int _) {
+	_++;
 	udp_interrupted = 1;
 }
 
@@ -58,7 +59,9 @@ int udp_server_setup(const char *port_num) {
  *	Inputs: word length
  *	Returns: max_errors
  */
-int max_errors(const int length) {
+int max_errors(char *word) {
+	size_t length = strlen(word);
+
 	if ( length < 7)
 		return 7;
 	if ( length < 11 )
@@ -143,10 +146,26 @@ int start_new_game(char *message) {
 	char PLID[PLID_SIZE + 1] = "\0";
 	char game_path[12 + PLID_SIZE] = "\0";
 
-	// Test PLID
-	strncpy( PLID, message + 4, PLID_SIZE );
-	if ( !is_valid_num(PLID, 1, 999999) )
+	// Test Command
+	if ( strncmp(message, "SNG ", 4) ) {
+		if ( is_verbose )
+			printf("[ERROR] unknown command '%s'\n", strip_message(message));
+		return sprintf( message, "ERR\n" );
+	}
+
+	// Get message parameters
+	if ( sscanf( message, "SNG %6c", PLID ) != 1 ) {
+		if ( is_verbose )
+			printf("[ERROR] SNG malformed command '%s'\n", strip_message(message));
 		return sprintf( message, "RSG ERR\n" );
+	}
+
+	// Test PLID
+	if ( !is_valid_num(PLID, 1, 999999) ) {
+		if ( is_verbose )
+			printf("[ERROR] SNG malformed PLID '%s'\n", PLID);
+		return sprintf( message, "RSG ERR\n" );
+	}
 	
 	sprintf( game_path, "GAMES/GAME_%s", PLID );
 	
@@ -154,8 +173,11 @@ int start_new_game(char *message) {
 	if ( !access(game_path, F_OK) ) {
 		game = load_game(game_path);
 
-		if ( !game.status )
+		if ( !game.status ) {
+			if ( is_verbose )
+				printf("PLID=%s: SNG active game found\n", PLID);
 			return sprintf( message, "RSG NOK\n" );
+		}
 	}
 
 	// Fill game struct
@@ -167,7 +189,7 @@ int start_new_game(char *message) {
 	strcpy( game.hint, hints[random_word] );
 	random_word++;
 
-	game.errors = max_errors( strlen(game.word) ) ;
+	game.errors = max_errors(game.word) ;
 
 	memset(game.current_state, 0, MAX_WORD_SIZE);
 	for (int i = strlen(game.word) - 1; i >= 0; i--)
@@ -191,34 +213,56 @@ int player_guess_letter(char *message) {
 	int i, trial;
 	char letter;
 	char PLID[PLID_SIZE + 1] = "\0";
-	char game_path[12 + PLID_SIZE] = "\0";
+	char game_path[16 + PLID_SIZE] = "\0";
+
+	// Test Command
+	if ( strncmp(message, "PLG ", 4) ) {
+		if ( is_verbose )
+			printf("[ERROR] unknown command '%s'\n", strip_message(message));
+		return sprintf( message, "ERR\n" );
+	}
 
 	// Get message parameters
-	if ( sscanf( message, "PLG %6c %c %d", PLID, &letter, &trial ) != 3 )
+	if ( sscanf( message, "PLG %6c %c %d", PLID, &letter, &trial ) != 3 ) {
+		if ( is_verbose )
+			printf("[ERROR] PLG malformed command '%s'\n", strip_message(message));
 		return sprintf( message, "RLG ERR\n" );
+	}
 
 	// Test PLID
-	if ( !is_valid_num(PLID, 1, 999999) )
+	if ( !is_valid_num(PLID, 1, 999999) ) {
+		if ( is_verbose )
+			printf("[ERROR] PLG malformed PLID '%s'\n", PLID);
 		return sprintf( message, "RLG ERR\n" );
+	}
 
-	sprintf( game_path, "GAMES/GAME_%s", PLID );
+	sprintf( game_path, "GAMES/GAME_%s.txt", PLID );
 
 	// Check if game exists, ERR if not
-	if ( access(game_path, F_OK) )
+	if ( access(game_path, F_OK) ) {
+		if ( is_verbose )
+			printf("[ERROR] PLG no game found for PLID '%s'\n", PLID);
 		return sprintf( message, "RLG ERR\n" );
+	}
 
 	game = load_game(game_path);
 
 	// Check if last game is finished
-	if ( game.status )
+	if ( game.status ) {
+		if ( is_verbose )
+			printf("[ERROR] PLG no active game found for PLID '%s'\n", PLID);
 		return sprintf( message, "RLG ERR\n" );
+	}
 
 	// Check trial num
 	if ( trial != game.trial ) {
 		// trial is different, check if last letter guessed is same as current
 		// if yes, then client repeated last move
-		if ( trial + 1 != game.trial || game.letters_guessed[strlen(game.letters_guessed) - 1] != letter )
+		if ( trial + 1 != game.trial || game.letters_guessed[strlen(game.letters_guessed) - 1] != letter ) {
+			if ( is_verbose )
+				printf("[ERROR] PLG wrong trial number for PLID '%s' - %d instead of %d\n", PLID, trial, game.trial);
 			return sprintf( message, "RLG INV\n" );
+		}
 
 		// Recalculates position
 		game.trial = trial;
@@ -226,9 +270,13 @@ int player_guess_letter(char *message) {
 	}
 
 	// Checks if letter is dupe
-	for ( i = 0; game.letters_guessed[i]; i++ )
-		if (game.letters_guessed[i] == letter)
+	for ( i = 0; game.letters_guessed[i]; i++ ) {
+		if (game.letters_guessed[i] == letter) {
+			if ( is_verbose )
+				printf("PLID=%s: guess letter \"%c\" - DUP;\n", game.PLID, letter);
 			return sprintf( message, "RLG DUP %d\n", trial );
+		}
+	}
 
 	// Inserts letter into guessed letters and history
 	game.letters_guessed[i] = letter;
@@ -282,6 +330,8 @@ int player_guess_letter(char *message) {
 		printf("PLID=%s: play letter \"%c\" - %d hits; WIN\n", game.PLID, letter, hits);
 	game.status = 1;
 	save_game(game_path, game);
+	sprintf( game_path, "SCORES/%2d_%s.txt", ((game.trial - (max_errors(game.word) - game.errors)) * 100) / game.trial, PLID );
+	save_game(game_path, game);
 	return sprintf( message, "RLG WIN %d\n", trial );
 }
 
@@ -292,32 +342,54 @@ int player_guess_word(char *message) {
 	char PLID[PLID_SIZE + 1] = "\0";
 	char game_path[12 + PLID_SIZE] = "\0";
 
+	// Test Command
+	if ( strncmp(message, "PWG ", 4) ) {
+		if ( is_verbose )
+			printf("[ERROR] unknown command '%s'\n", strip_message(message));
+		return sprintf( message, "ERR\n" );
+	}
+
 	// Get message parameters
-	if ( sscanf( message, "PWG %6c %s %d", PLID, word, &trial ) != 3 )
+	if ( sscanf( message, "PWG %6c %s %d", PLID, word, &trial ) != 3 ) {
+		if ( is_verbose )
+			printf("[ERROR] malformed command '%s'\n", strip_message(message));
 		return sprintf( message, "RWG ERR\n" );
+	}
 
 	// Test PLID
-	if ( !is_valid_num(PLID, 1, 999999) )
+	if ( !is_valid_num(PLID, 1, 999999) ) {
+		if ( is_verbose )
+			printf("[ERROR] malformed PLID '%s'\n", PLID);
 		return sprintf( message, "RWG ERR\n" );
+	}
 
 	sprintf( game_path, "GAMES/GAME_%s", PLID );
 
 	// Check if game exists, ERR if not
-	if ( access(game_path, F_OK) )
+	if ( access(game_path, F_OK) ) {
+		if ( is_verbose )
+			printf("[ERROR] PWG no game found for PLID '%s'\n", PLID);
 		return sprintf( message, "RWG ERR\n" );
+	}
 
 	game = load_game(game_path);
 
 	// Check if last game is finished
-	if ( game.status )
+	if ( game.status ) {
+		if ( is_verbose )
+			printf("[ERROR] PWG no active game found for PLID '%s'\n", PLID);
 		return sprintf( message, "RWG ERR\n" );
+	}
 
 	// Check trial num
 	if ( trial != game.trial ) {
 		// trial is different, check if last letter guessed is same as current
 		// if yes, then client repeated last move
-		if ( trial + 1 != game.trial || strcmp(game.guesses[game.trial - 2], word) )
+		if ( trial + 1 != game.trial || strcmp(game.guesses[game.trial - 2], word) ) {
+			if ( is_verbose )
+				printf("[ERROR] PWG wrong trial number for PLID '%s' - %d instead of %d\n", PLID, trial, game.trial);
 			return sprintf( message, "RWG INV\n" );
+		}
 		
 		// Recalculates position
 		game.trial = trial;
@@ -325,9 +397,13 @@ int player_guess_word(char *message) {
 	}
 
 	// Checks if letter is dupe
-	for ( i = 0; game.guesses[i][0]; i++ )
-		if ( !strcmp(game.guesses[i], word) )
+	for ( i = 0; game.guesses[i][0]; i++ ) {
+		if ( !strcmp(game.guesses[i], word) ) {
+			if ( is_verbose )
+				printf("PLID=%s: guess word \"%s\" - DUP;\n", game.PLID, word);
 			return sprintf( message, "RWG DUP %d\n", trial );
+		}
+	}
 
 	// Inserts word into guessed letters and history
 	strcpy(game.guesses[game.trial - 1], word);
@@ -357,6 +433,8 @@ int player_guess_word(char *message) {
 		printf("PLID=%s: guess word \"%s\" - WIN\n", game.PLID, word);
 	game.status = 1;
 	save_game(game_path, game);
+	sprintf( game_path, "SCORES/%2d_%s.txt", ((game.trial - (max_errors(game.word) - game.errors)) * 100) / game.trial, PLID );
+	save_game(game_path, game);
 	return sprintf( message, "RWG WIN %d\n", trial );
 }
 
@@ -365,13 +443,26 @@ int player_quit_game(char *message) {
 	char PLID[PLID_SIZE + 1] = "\0";
 	char game_path[12 + PLID_SIZE] = "\0";
 
+	// Test Command
+	if ( strncmp(message, "QUT ", 4) ) {
+		if ( is_verbose )
+			printf("[ERROR] unknown command '%s'\n", strip_message(message));
+		return sprintf( message, "ERR\n" );
+	}
+
 	// Get message parameters
-	if ( sscanf( message, "QUT %6c", PLID ) != 1 )
+	if ( sscanf( message, "QUT %6c", PLID ) != 1 ) {
+		if ( is_verbose )
+			printf("[ERROR] malformed command '%s'\n", strip_message(message));
 		return sprintf( message, "RQT ERR\n" );
+	}
 
 	// Test PLID
-	if ( !is_valid_num(PLID, 1, 999999) )
+	if ( !is_valid_num(PLID, 1, 999999) ) {
+		if ( is_verbose )
+			printf("[ERROR] malformed PLID '%s'\n", PLID);
 		return sprintf( message, "RQT ERR\n" );
+	}
 
 	sprintf( game_path, "GAMES/GAME_%s", PLID );
 

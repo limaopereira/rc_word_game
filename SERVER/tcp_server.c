@@ -27,9 +27,10 @@ static volatile sig_atomic_t tcp_interrupted = 0;
 /*
  *	Catches Ctrl-C to safely stop everything
  *
- *	Argument required but isn't used, no need to name it
+ *	Argument required but isn't used
  */
-void tcp_sig_handler(int) {
+void tcp_sig_handler(int _) {
+	_++;
 	tcp_interrupted = 1;
 }
 
@@ -90,6 +91,14 @@ int write_message(int socket, char *message, ssize_t size) {
 }
 
 int send_scoreboard(int socket, char *message) {
+
+	// Test Command
+	if ( strncmp(message, "GSB ", 4) ) {
+		if ( is_verbose )
+			printf("[ERROR] unknown command '%s'\n", strip_message(message));
+		return write_message( socket, "ERR\n", 4 );
+	}
+
 	return 0;
 	/*
 	struct game game;
@@ -125,25 +134,44 @@ int send_hint(int socket, char *message) {
 	char game_path[12 + PLID_SIZE] = "\0";
 	char hint_path[7 + MAX_HINT_SIZE] = "\0";
 
+	// Test Command
+	if ( strncmp(message, "GHL ", 4) ) {
+		if ( is_verbose )
+			printf("[ERROR] unknown command '%s'\n", strip_message(message));
+		return write_message( socket, "ERR\n", 4 );
+	}
+
 	// Get message parameters
-	if ( sscanf( message, "GHL %6c", PLID ) != 1 )
+	if ( sscanf( message, "GHL %6c", PLID ) != 1 ) {
+		if ( is_verbose )
+			printf("[ERROR] GHL malformed command '%s'\n", strip_message(message));
 		return write_message( socket, "RHL NOK\n", 8 );
+	}
 
 	// Test PLID
-	if ( !is_valid_num(PLID, 1, 999999) )
+	if ( !is_valid_num(PLID, 1, 999999) ) {
+		if ( is_verbose )
+			printf("[ERROR] GHL malformed PLID '%s'\n", PLID);
 		return write_message( socket, "RHL NOK\n", 8 );
+	}
 
 	sprintf( game_path, "GAMES/GAME_%s", PLID );
 
 	// Check if game exists, NOK if not
-	if ( access(game_path, F_OK) )
+	if ( access(game_path, F_OK) ) {
+		if ( is_verbose )
+			printf("[ERROR] GHL game not found for PLID '%s'\n", PLID);
 		return write_message( socket, "RHL NOK\n", 8 );
+	}
 
 	game = load_game(game_path);
 
 	// Check if last game is finished
-	if ( game.status )
+	if ( game.status ) {
+		if ( is_verbose )
+			printf("[ERROR] GHL active game not found for PLID '%s'\n", PLID);
 		return write_message( socket, "RHL NOK\n", 8 );
+	}
 
 	sprintf( hint_path, "IMAGES/%s", game.hint );
 	hint_file = fopen( hint_path, "r" );
@@ -173,19 +201,35 @@ int send_state(int socket, char *message) {
 	char PLID[PLID_SIZE + 1] = "\0";
 	char game_path[12 + PLID_SIZE] = "\0";
 
+	// Test Command
+	if ( strncmp(message, "STA ", 4) ) {
+		if ( is_verbose )
+			printf("[ERROR] unknown command '%s'\n", strip_message(message));
+		return write_message( socket, "ERR\n", 4 );
+	}
+
 	// Get message parameters
-	if ( sscanf( message, "STA %6c", PLID ) != 1 )
+	if ( sscanf( message, "STA %6c", PLID ) != 1 ) {
+		if ( is_verbose )
+			printf("[ERROR] STA malformed command '%s'\n", strip_message(message));
 		return write_message( socket, "RST NOK\n", 8 );
+	}
 
 	// Test PLID
-	if ( !is_valid_num(PLID, 1, 999999) )
+	if ( !is_valid_num(PLID, 1, 999999) ) {
+		if ( is_verbose )
+			printf("[ERROR] STA malformed PLID '%s'\n", PLID);
 		return write_message( socket, "RST NOK\n", 8 );
+	}
 
 	sprintf( game_path, "GAMES/GAME_%s", PLID );
 
 	// Check if game exists, NOK if not
-	if ( access(game_path, F_OK) )
+	if ( access(game_path, F_OK) ) {
+		if ( is_verbose )
+			printf("[ERROR] STA game not found for PLID '%s'\n", PLID);
 		return write_message( socket, "RST NOK\n", 8 );
+	}
 
 	game = load_game(game_path);
 

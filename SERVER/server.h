@@ -2,7 +2,7 @@
 #ifndef SERVER_H
 #define SERVER_H
 
-#define TIMEOUT_MS 100 // 0.1 seconds
+#define TIMEOUT_MS 100 // 0.1 seconds for UDP, 5 seconds for TCP
 
 #define LETTER_COUNT 26 // How many letters in the alphabet
 #define MAX_SIZE 128
@@ -35,10 +35,13 @@ typedef struct{
 } SCORELIST;
 
 // Checks snum for valid num inside [start, end]
-int is_valid_num(const char *snum, const int start, const int end);
+int is_valid_num(const char *, const int , const int );
+
+// Removes newlines for easier printing
+char* strip_message(char *);
 
 // Loads game file required for both UDP and TCP
-struct game load_game(const char *game_path);
+struct game load_game(const char *);
 
 // Configures socket based on mode
 int server_socket_setup(const char *, const int);
