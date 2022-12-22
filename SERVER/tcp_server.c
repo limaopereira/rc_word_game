@@ -268,7 +268,7 @@ int send_state(int socket, char *message) {
 		bytes_written += sprintf( buffer + bytes_written, "  Active game found for player %s\n", game.PLID );
 		bytes_written += sprintf( buffer + bytes_written, "     --- Transactions found: %d ---\n", game.trial - 1 );
 
-		for ( int i = 0; i < game.trial - 1; i++ ) {
+		for ( int i = 0; i < game.trial; i++ ) {
 			if ( game.guesses[i][1] != '\0' ) {
 				bytes_written += sprintf( buffer + bytes_written, "     Word guess: %s\n", game.guesses[i] );
 			} else {
@@ -290,7 +290,7 @@ int send_state(int socket, char *message) {
 		bytes_written += sprintf( buffer + bytes_written, "     Word: %s; Hint file: %s\n", game.word, game.hint );
 		bytes_written += sprintf( buffer + bytes_written, "     --- Transactions found: %d ---\n", game.trial - 1 );
 
-		for ( int i = 0; i < game.trial - 1; i++ ) {
+		for ( int i = 0; i < game.trial; i++ ) {
 			if ( game.guesses[i][1] != '\0' ) {
 				bytes_written += sprintf( buffer + bytes_written, "     Word guess: %s\n", game.guesses[i] );
 			} else {
@@ -310,7 +310,7 @@ int send_state(int socket, char *message) {
 	}
 
 	if ( is_verbose )
-		printf("PLID=%s: send state file 'STATUS_%s.txt' (%ld bytes)\n", game.PLID, game.hint, bytes_written);
+		printf("PLID=%s: send state file 'STATUS_%s.txt' (%ld bytes)\n", game.PLID, game.PLID, bytes_written);
 
 	write_message( socket, message, strlen(message) );
 	write_message( socket, buffer, bytes_written );
