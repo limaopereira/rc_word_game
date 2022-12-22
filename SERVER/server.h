@@ -40,6 +40,9 @@ int is_valid_num(const char *, const int , const int );
 // Removes newlines for easier printing
 char* strip_message(char *);
 
+// Returns num of tries based on word length
+int max_errors(char *);
+
 // Loads game file required for both UDP and TCP
 struct game load_game(const char *);
 

@@ -3,9 +3,10 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include <dirent.h> // Folder shenanigans
 #include <signal.h> // To catch Ctrl-C
 
-//#include <errno.h>
 #include <netdb.h>
 #include <sys/socket.h>
 
@@ -144,7 +145,7 @@ struct game load_game(const char *game_path) {
 int start_new_game(char *message) {
 	struct game game;
 	char PLID[PLID_SIZE + 1] = "\0";
-	char game_path[12 + PLID_SIZE] = "\0";
+	char game_path[16 + PLID_SIZE] = "\0";
 
 	// Test Command
 	if ( strncmp(message, "SNG ", 4) ) {
@@ -167,7 +168,7 @@ int start_new_game(char *message) {
 		return sprintf( message, "RSG ERR\n" );
 	}
 	
-	sprintf( game_path, "GAMES/GAME_%s", PLID );
+	sprintf( game_path, "GAMES/GAME_%s.txt", PLID );
 	
 	// Check if game exists and is ongoing, NOK if yes to both
 	if ( !access(game_path, F_OK) ) {
@@ -212,6 +213,7 @@ int player_guess_letter(char *message) {
 	struct game game;
 	int i, trial;
 	char letter;
+	char score[4] = "\0";
 	char PLID[PLID_SIZE + 1] = "\0";
 	char game_path[16 + PLID_SIZE] = "\0";
 
@@ -328,19 +330,38 @@ int player_guess_letter(char *message) {
 
 	if ( is_verbose )
 		printf("PLID=%s: play letter \"%c\" - %d hits; WIN\n", game.PLID, letter, hits);
+
 	game.status = 1;
 	save_game(game_path, game);
-	sprintf( game_path, "SCORES/%2d_%s.txt", ((game.trial - (max_errors(game.word) - game.errors)) * 100) / game.trial, PLID );
+
+	// Save to SCORES, check if previous game and overwrite if better
+	struct dirent **namelist;
+	i = scandir("SCORES/", &namelist, NULL, alphasort);
+	while (i--) {
+		if ( !strncmp( namelist[i]->d_name + 4, PLID, PLID_SIZE ) )
+			strcpy(score, namelist[i]->d_name);
+		free(namelist[i]);
+	}
+	free(namelist);
+	i = ((game.trial - (max_errors(game.word) - game.errors)) * 100) / game.trial;
+	if ( is_valid_num(score, 1, 100) < i ) {
+		sprintf( game_path, "SCORES/%s_%s.txt", score, PLID );
+		remove(game_path);
+		sprintf( game_path, "SCORES/%3d_%s.txt", i, PLID );
+		save_game(game_path, game);
+	}
 	save_game(game_path, game);
+
 	return sprintf( message, "RLG WIN %d\n", trial );
 }
 
 int player_guess_word(char *message) {
 	struct game game;
 	int i, trial;
+	char score[4] = "\0";
 	char word[MAX_WORD_SIZE] = "\0";
 	char PLID[PLID_SIZE + 1] = "\0";
-	char game_path[12 + PLID_SIZE] = "\0";
+	char game_path[16 + PLID_SIZE] = "\0";
 
 	// Test Command
 	if ( strncmp(message, "PWG ", 4) ) {
@@ -363,7 +384,7 @@ int player_guess_word(char *message) {
 		return sprintf( message, "RWG ERR\n" );
 	}
 
-	sprintf( game_path, "GAMES/GAME_%s", PLID );
+	sprintf( game_path, "GAMES/GAME_%s.txt", PLID );
 
 	// Check if game exists, ERR if not
 	if ( access(game_path, F_OK) ) {
@@ -433,15 +454,33 @@ int player_guess_word(char *message) {
 		printf("PLID=%s: guess word \"%s\" - WIN\n", game.PLID, word);
 	game.status = 1;
 	save_game(game_path, game);
-	sprintf( game_path, "SCORES/%2d_%s.txt", ((game.trial - (max_errors(game.word) - game.errors)) * 100) / game.trial, PLID );
+
+
+	// Save to SCORES, check if previous game and overwrite if better
+	struct dirent **namelist;
+	i = scandir("SCORES/", &namelist, NULL, alphasort);
+	while (i--) {
+		if ( !strncmp( namelist[i]->d_name + 4, PLID, PLID_SIZE ) )
+			strcpy(score, namelist[i]->d_name);
+		free(namelist[i]);
+	}
+	free(namelist);
+	i = ((game.trial - (max_errors(game.word) - game.errors)) * 100) / game.trial;
+	if ( is_valid_num(score, 1, 100) < i ) {
+		sprintf( game_path, "SCORES/%s_%s.txt", score, PLID );
+		remove(game_path);
+		sprintf( game_path, "SCORES/%3d_%s.txt", i, PLID );
+		save_game(game_path, game);
+	}
 	save_game(game_path, game);
+
 	return sprintf( message, "RWG WIN %d\n", trial );
 }
 
 int player_quit_game(char *message) {
 	struct game game;
 	char PLID[PLID_SIZE + 1] = "\0";
-	char game_path[12 + PLID_SIZE] = "\0";
+	char game_path[16 + PLID_SIZE] = "\0";
 
 	// Test Command
 	if ( strncmp(message, "QUT ", 4) ) {
@@ -464,7 +503,7 @@ int player_quit_game(char *message) {
 		return sprintf( message, "RQT ERR\n" );
 	}
 
-	sprintf( game_path, "GAMES/GAME_%s", PLID );
+	sprintf( game_path, "GAMES/GAME_%s.txt", PLID );
 
 	// Check if game exists, ERR if not
 	if ( access(game_path, F_OK) )

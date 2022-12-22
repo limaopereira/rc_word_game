@@ -3,6 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+
+#include <dirent.h> // Folder shenanigans
 #include <signal.h> // To catch Ctrl-C
 
 #include <netdb.h>
@@ -91,38 +93,55 @@ int write_message(int socket, char *message, ssize_t size) {
 }
 
 int send_scoreboard(int socket, char *message) {
+	struct game game;
+	size_t bytes_written = 0;
+	char game_path[16 + 255] = "\0";
+	char *buffer = (char *) calloc( 80 * 13, sizeof(char) ); // 80 characters per line, 13 lines
 
 	// Test Command
-	if ( strncmp(message, "GSB ", 4) ) {
+	if ( strncmp(message, "GSB\n", 4) ) {
 		if ( is_verbose )
 			printf("[ERROR] unknown command '%s'\n", strip_message(message));
 		return write_message( socket, "ERR\n", 4 );
 	}
 
-	return 0;
-	/*
-	struct game game;
-	char PLID[PLID_SIZE + 1] = "\0";
-	char game_path[12 + PLID_SIZE] = "\0";
+	// Read SCORES folder
+	struct dirent **namelist;
+	int n_files = scandir("SCORES/", &namelist, NULL, alphasort) - 1;
 
-	// Check if ay games exist, EMPTY if not
-	if ( access(game_path, F_OK) )
+	// Is SCORES empty?
+	if ( n_files < 0 ) {
+		if ( is_verbose )
+			printf("[ERROR] GSB no games on record '%s'\n", strip_message(message));
 		return write_message( socket, "RSB EMPTY\n", 10 );
+	}
 
-	game = load_game(game_path);
+	bytes_written += sprintf( buffer + bytes_written, "\n-------------------------------- TOP 10 SCORES --------------------------------\n" );
+	bytes_written += sprintf( buffer + bytes_written, "\n    SCORE PLAYER     WORD                             GOOD TRIALS  TOTAL TRIALS\n\n" );
 
-	size_t bytes_written = 0;
-	//char *buffer = (char *) calloc( MAX_HINT_SIZE * (MAX_TRIES + 3), sizeof(char) );
+	for (int i = n_files; i >= 0; i++) {
+		if ( n_files - i < 10 ) {
 
-	// Check if last game is finished
-	//if ( !game.status )
+			sprintf( game_path, "SCORES/%s", namelist[i]->d_name );
+			game = load_game(game_path);
+			int hits = (game.trial - (max_errors(game.word) - game.errors));
+			int score = (hits * 100) / game.trial;
+			bytes_written += sprintf( buffer + bytes_written, "%2d - %3d  %s  %-38s  %-12d %-2d\n", n_files - i + 1, score, game.PLID, game.word, hits, game.trial );
 
+		}
+		free(namelist[i]);
+	}
+	free(namelist);
+	bytes_written += sprintf( buffer + bytes_written, "\n\n" );
+
+	sprintf( message, "RSB OK TOPSCORES.txt %ld ", strlen(buffer));
 	if ( is_verbose )
-		printf("PLID=%s: send scoreboard file 'SCOREBOARD.txt' (%ld bytes)\n", bytes_written);
+		printf("PLID=------: send scoreboard file 'TOPSCORES.txt' (%ld bytes)\n", bytes_written);
 
 	write_message( socket, message, strlen(message) );
-	return write_message( socket, buffer, bytes_written );
-	*/
+	write_message( socket, buffer, bytes_written );
+	free(buffer);
+	return 0;
 }
 
 int send_hint(int socket, char *message) {
@@ -131,7 +150,7 @@ int send_hint(int socket, char *message) {
 	struct game game;
 	char *buffer;
 	char PLID[PLID_SIZE + 1] = "\0";
-	char game_path[12 + PLID_SIZE] = "\0";
+	char game_path[16 + PLID_SIZE] = "\0";
 	char hint_path[7 + MAX_HINT_SIZE] = "\0";
 
 	// Test Command
@@ -155,7 +174,7 @@ int send_hint(int socket, char *message) {
 		return write_message( socket, "RHL NOK\n", 8 );
 	}
 
-	sprintf( game_path, "GAMES/GAME_%s", PLID );
+	sprintf( game_path, "GAMES/GAME_%s.txt", PLID );
 
 	// Check if game exists, NOK if not
 	if ( access(game_path, F_OK) ) {
@@ -193,7 +212,9 @@ int send_hint(int socket, char *message) {
 		printf("PLID=%s: send hint file '%s' (%ld bytes)\n", game.PLID, game.hint, n_bytes);
 
 	write_message( socket, message, message_bytes );
-	return write_message( socket, buffer, n_bytes );
+	write_message( socket, buffer, n_bytes );
+	free(buffer);
+	return 0;
 }
 
 int send_state(int socket, char *message) {
@@ -222,7 +243,7 @@ int send_state(int socket, char *message) {
 		return write_message( socket, "RST NOK\n", 8 );
 	}
 
-	sprintf( game_path, "GAMES/GAME_%s", PLID );
+	sprintf( game_path, "GAMES/GAME_%s.txt", PLID );
 
 	// Check if game exists, NOK if not
 	if ( access(game_path, F_OK) ) {
@@ -286,7 +307,9 @@ int send_state(int socket, char *message) {
 		printf("PLID=%s: send state file 'STATUS_%s.txt' (%ld bytes)\n", game.PLID, game.hint, bytes_written);
 
 	write_message( socket, message, strlen(message) );
-	return write_message( socket, buffer, bytes_written );
+	write_message( socket, buffer, bytes_written );
+	free(buffer);
+	return 0;
 }
 
 

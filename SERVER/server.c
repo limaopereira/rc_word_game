@@ -7,7 +7,6 @@
 #include <netdb.h>
 #include <sys/socket.h>
 
-#include <dirent.h>		// Folder shenanigans
 #include <sys/wait.h>	// To let main wait for all children to stop
 #include <sys/time.h>
 
@@ -246,7 +245,6 @@ int main(int argc, char **argv) {
 
 	// Waits for all the child processes to finish
 	while ( (wpid = wait(NULL)) > 0 );
-	printf("ADEEUUUS\n");
 
 	exit(EXIT_SUCCESS);
 }
