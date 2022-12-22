@@ -105,21 +105,27 @@ int send_scoreboard(int socket, char *message) {
 		return write_message( socket, "ERR\n", 4 );
 	}
 
+	printf("command '%s'\n", strip_message(message));
+
 	// Read SCORES folder
 	struct dirent **namelist;
 	int n_files = scandir("SCORES/", &namelist, NULL, alphasort) - 1;
 
+	printf("command '%s' -- nfiles = %d\n", strip_message(message), n_files);
+
 	// Is SCORES empty?
-	if ( n_files < 0 ) {
+	if ( n_files < 2 ) {
 		if ( is_verbose )
 			printf("[ERROR] GSB no games on record '%s'\n", strip_message(message));
 		return write_message( socket, "RSB EMPTY\n", 10 );
 	}
 
+	printf("command '%s' -- nfiles = %d\n", strip_message(message), n_files);
+
 	bytes_written += sprintf( buffer + bytes_written, "\n-------------------------------- TOP 10 SCORES --------------------------------\n" );
 	bytes_written += sprintf( buffer + bytes_written, "\n    SCORE PLAYER     WORD                             GOOD TRIALS  TOTAL TRIALS\n\n" );
 
-	for (int i = n_files; i >= 0; i++) {
+	for (int i = n_files; i > 1; i--) {
 		if ( n_files - i < 10 ) {
 
 			sprintf( game_path, "SCORES/%s", namelist[i]->d_name );
@@ -220,7 +226,7 @@ int send_hint(int socket, char *message) {
 int send_state(int socket, char *message) {
 	struct game game;
 	char PLID[PLID_SIZE + 1] = "\0";
-	char game_path[12 + PLID_SIZE] = "\0";
+	char game_path[16 + PLID_SIZE] = "\0";
 
 	// Test Command
 	if ( strncmp(message, "STA ", 4) ) {
